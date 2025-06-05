@@ -1,0 +1,15 @@
+# Cache e ambientes virtuais Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Variáveis de ambiente e segredos
+.env
+*.env
+.streamlit/secrets.toml # Se você estiver usando secrets do Streamlit localmente
+.DS_Store
+
+# Log files
+*.log
