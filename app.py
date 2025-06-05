@@ -31,12 +31,18 @@ PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
 st.title("✈️ Chatbot de Movimentações Aeroportuárias")
 st.markdown(
     """
-    Olá! Sou seu parceiro de programação para dados de movimentações aeroportuárias.
+    #### Olá! Sou seu assitente virtual do **Observatório de Dados** do Instituto Brasileiro de Infraestrutura.
+    ---
+    Fui treinado com dados das movimentações aeroportuárias de 2019 à 2024.
+
     Posso responder a perguntas como:
-    - "Qual o volume de passageiros que chegaram em Recife em janeiro de 2024?"
-    - "Total de carga em Guarulhos em 2024?"
-    - "Qual o aeroporto mais movimentado do Brasil?"
-    - "Qual aeroporto com mais voos internacionais?"
+    > Qual o volume de passageiros que chegaram em Recife em janeiro de 2024?
+    >
+    > Total de carga em Guarulhos em 2024?
+    >
+    > Qual o aeroporto mais movimentado do Brasil?
+    >
+    > Qual aeroporto com mais voos internacionais?
     """
 )
 
