@@ -605,7 +605,7 @@ def chatbot():
             total_valor = resultados_df['TotalValor'].iloc[0]
 
             # --- Resposta Semântica Aprimorada (existente) ---
-            resposta_semantica = f"No "
+            resposta_semantica = f"No " 
             
             if parametros.get('mes'):
                 nome_do_mes = mes_numero_para_nome.get(parametros['mes'], str(parametros['mes']))
