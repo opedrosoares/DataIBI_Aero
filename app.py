@@ -18,7 +18,8 @@ from chatbot_logic import (
     formatar_numero_br,
     aeroporto_nome_para_icao,
     mes_numero_para_nome,
-    operador_icao_para_nome
+    operador_icao_para_nome,
+    obter_operador_maiores_atrasos
 )
 
 # --- Configuração da página Streamlit ---
@@ -32,6 +33,12 @@ st.set_page_config(
 # Caminho para a pasta de arquivos Parquet
 PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
 
+# --- Obter o Último Ano Disponível (NOVA SEÇÃO AQUI) ---
+# Executa a função para obter o ano logo no carregamento do app
+ultimo_ano = obter_ultimo_ano_disponivel(PASTA_ARQUIVOS_PARQUET)
+if ultimo_ano is None:
+    st.error("Não foi possível determinar o último ano disponível nos dados. Verifique a pasta de arquivos Parquet.")
+    st.stop() # Para o app se o ano não puder ser obtido
 
 # --- Adicionar Logo no Topo da Página (ANTES DO TÍTULO) ---
 LOGO_PATH = "images/logo.svg" # Certifique-se de que este caminho está correto
@@ -94,25 +101,27 @@ else:
 # --- Título e Descrição do Chatbot ---
 st.title("✈️ Chatbot de Movimentações Aeroportuárias")
 st.markdown(
-    """
+    f"""
     ---
     ##### Olá! Sou seu assistente virtual do *Observatório de Dados* do Instituto Brasileiro de Infraestrutura.
-    Fui treinado com dados das movimentações aeroportuárias de 2019 à 2024.
+    Fui treinado com dados das movimentações aeroportuárias de **2019 à {ultimo_ano}**.
 
     Posso responder a perguntas como:
     """
 )
 
-# --- Perguntas de Exemplo como Botões ---
+# --- Perguntas de Exemplo como Botões (AGORA DINÂMICAS) ---
 preset_questions = [
-    "Qual o volume de passageiros que chegaram em Recife em janeiro de 2024?",
-    "Total de carga transportada em Guarulhos em 2024?",
-    "Qual o aeroporto mais movimentado do Brasil?",
-    "Qual aeroporto com mais voos internacionais?",
-    "Qual a empresa que mais transportou passageiros em 2024?",
-    "Qual o operador que mais transportou cargas em Brasília?",
-    "Qual foi o principal destino para o aeroporto de Brasília em 2024?",
-    "Qual o destino mais acessado no Brasil?"
+    f"Qual o volume de passageiros que chegaram em Recife em janeiro de {ultimo_ano}?",
+    f"Total de carga transportada em Guarulhos em {ultimo_ano}?",
+    "Qual o aeroporto mais movimentado do Brasil?", # Não precisa de ano aqui, a função já usa ultimo_ano
+    "Qual aeroporto com mais voos internacionais?", # Não precisa de ano aqui
+    f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
+    f"Qual o operador que mais transportou cargas em Brasília em {ultimo_ano}?",
+    f"Qual foi o principal destino para o aeroporto de Brasília em {ultimo_ano}?",
+    "Qual o destino mais acessado no Brasil?", # Não precisa de ano aqui
+    f"Qual a empresa com maiores atrasos em Brasília em {ultimo_ano}?",
+    f"Qual o operador com maiores atrasos no Brasil em {ultimo_ano}?"
 ]
 
 # Inicializa o estado para armazenar o prompt de um botão
@@ -173,24 +182,40 @@ if current_prompt:
                 parametros.get('intencao_mais_voos_internacionais') or
                 parametros.get('intencao_maior_operador_pax') or
                 parametros.get('intencao_maior_operador_carga') or
-                parametros.get('intencao_principal_destino')
+                parametros.get('intencao_principal_destino') or
+                parametros.get('intencao_maiores_atrasos')
             ):
                 feedback_usuario.append("Não consegui extrair informações relevantes da sua pergunta.")
             else:
                 for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais",
-                            "intencao_maior_operador_pax", "intencao_maior_operador_carga", "intencao_principal_destino"]:
+                            "intencao_maior_operador_pax", "intencao_maior_operador_carga", "intencao_principal_destino", "intencao_maiores_atrasos"]:
                     if key not in parametros or not isinstance(parametros[key], bool):
                         parametros[key] = False
 
+                # Verifica se é uma das perguntas de ranking que NÃO PRECISA de ano, se não for, pede o ano
+                # As intenções de ranking podem ter o ano como null (último ano disponível).
+                # A intenção de 'principal destino' e 'maiores atrasos' PODE ter aeroporto nulo (para 'no Brasil').
+                # Portanto, a condição para pedir aeroporto e ano precisa ser mais granular.
+                
+                # Se não for uma das perguntas de ranking...
                 if not (parametros['intencao_mais_movimentado'] or parametros['intencao_mais_voos_internacionais'] or
                         parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or
-                        parametros['intencao_principal_destino']):
+                        parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
+                    # Para perguntas "normais" de volume/carga, aeroporto e ano são geralmente essenciais.
                     if not parametros.get('aeroporto'):
                         feedback_usuario.append("Não identifiquei o aeroporto. Poderia especificar o nome ou código ICAO?")
                     if not parametros.get('ano'):
                         if not (parametros.get('aeroporto') and parametros.get('mes')):
                             feedback_usuario.append("Não identifiquei o ano. Poderia especificar o ano da movimentação?")
                 
+                # Para perguntas de ranking específicas que exigem aeroporto (como operador no aeroporto X)
+                # ou se o aeroporto for fornecido mas não mapeado para ICAO.
+                if (parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
+                    if parametros.get('aeroporto') and (parametros.get('aeroporto').upper() not in aeroporto_nome_para_icao.values()):
+                        # Se o aeroporto foi extraído, mas não está no nosso mapeamento, e não é uma pergunta nacional
+                        if not (parametros['aeroporto'].lower() == "brasil" or parametros['aeroporto'] == "null"): # Assume que 'null' ou 'brasil' não exigem ICAO
+                            feedback_usuario.append(f"O aeroporto '{parametros['aeroporto']}' não é reconhecido. Poderia usar um código ICAO ou nome mais comum?")
+
             if feedback_usuario:
                 resposta_chatbot = f"Desculpe. {' '.join(feedback_usuario)} Por favor, tente novamente de forma mais clara."
             else:
@@ -276,6 +301,30 @@ if current_prompt:
                     else:
                         resposta_chatbot = f"Não foi possível determinar o principal destino para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_origem_filtro if aeroporto_origem_filtro else 'todos'})."
 
+                elif parametros['intencao_maiores_atrasos']: # NOVO BLOCO AQUI
+                    ano_referencia = parametros.get('ano')
+                    aeroporto_filtro = parametros.get('aeroporto')
+                    
+                    resultado_atrasos = obter_operador_maiores_atrasos(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
+                    
+                    if resultado_atrasos:
+                        nome_operador_completo = operador_icao_para_nome.get(resultado_atrasos['operador'].upper(), resultado_atrasos['operador'].upper())
+                        total_minutos_atraso = resultado_atrasos['total_minutos_atraso']
+                        
+                        # Converter minutos para horas e minutos para exibição amigável
+                        horas = int(total_minutos_atraso // 60)
+                        minutos = int(total_minutos_atraso % 60)
+
+                        ano_str = f" em {resultado_atrasos['ano']}" if resultado_atrasos['ano'] else ""
+                        aeroporto_str_exibicao = ""
+                        if aeroporto_filtro:
+                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
+                            aeroporto_str_exibicao = f" no aeroporto de **{nome_aeroporto_exibicao.title()}**"
+
+                        resposta_chatbot = f"A empresa com maiores atrasos{aeroporto_str_exibicao}{ano_str} foi a **{nome_operador_completo}**, com um total de **{horas} horas e {minutos} minutos** de atraso em pousos."
+                    else:
+                        resposta_chatbot = f"Não foi possível determinar a empresa com maiores atrasos para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+                
                 else: # Lógica para perguntas gerais de volume/carga
                     tipo_consulta_db = "passageiros"
                     if parametros.get('intencao_carga'):

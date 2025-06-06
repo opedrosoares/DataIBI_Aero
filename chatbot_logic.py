@@ -5,6 +5,8 @@ import duckdb
 import openai
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
+from datetime import datetime, timedelta # Certifique-se que datetime e timedelta estão importados
+
 
 # --- Configuração da API da OpenAI ---
 try:
@@ -591,59 +593,152 @@ def obter_principal_destino(pasta_parquet, aeroporto_origem=None, ano=None):
     finally:
         con.close()
 
-# --- Função de Parsing da Pergunta do Usuário com LLM (OpenAI - Aprimorada para Operadores) ---
+# --- NOVA FUNÇÃO: Obter Operador com Maiores Atrasos ---
+def obter_operador_maiores_atrasos(pasta_parquet, ano=None, aeroporto=None):
+    """
+    Retorna o operador com o maior tempo total de atraso em pousos para o ano/aeroporto especificado.
+    Se o ano for None, usa o último ano disponível.
+    """
+    if not os.path.exists(pasta_parquet):
+        return None
+
+    if ano is None:
+        ano = obter_ultimo_ano_disponivel(pasta_parquet)
+        if ano is None:
+            return None
+
+    con = duckdb.connect(database=':memory:', read_only=False)
+    arquivos_parquet = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith('.parquet')]
+
+    if not arquivos_parquet:
+        con.close()
+        return None
+    
+    condicoes = [f"ANO = {ano}", "NR_MOVIMENTO_TIPO = 'P'", "NR_AERONAVE_OPERADOR != 'GERAL'"] # Atrasos são calculados no pouso
+    if aeroporto:
+        condicoes.append(f"NR_AEROPORTO_REFERENCIA = '{aeroporto.upper()}'")
+    
+    where_clause = "WHERE " + " AND ".join(condicoes) if condicoes else ""
+
+    # Usamos uma subquery ou CTE para calcular os atrasos em minutos,
+    # pois o DuckDB não pode chamar funções complexas de datetime diretamente em SQL strings.
+    # Primeiro, selecionamos os dados, convertendo as datas/horas para um formato manipulável.
+    # Depois, calculamos a diferença.
+    # Note: HH_PREVISTO e HH_CALCO são objetos complexos no JSON.
+    # Precisamos acessar 'TotalMinutes' ou 'TotalSeconds' deles.
+
+    # Assumindo que 'HH_PREVISTO' e 'HH_CALCO' no Parquet podem ser tratados como strings
+    # ou que o DuckDB pode acessá-los como structs/map.
+    # Se o DuckDB não puder acessar diretamente 'HH_PREVISTO.TotalMinutes',
+    # precisaremos carregar para Pandas, calcular, e depois agrupar.
+    # No entanto, a forma como você carregou o JSON para Parquet transformou essas colunas
+    # em 'object' (Python dict/struct). O DuckDB tem suporte limitado a isso.
+    # A maneira mais robusta é pré-processar isso no Pandas ANTES de salvar no Parquet,
+    # ou usar UDFs no DuckDB (mais complexo).
+
+    # Para este problema, vamos assumir que podemos extrair TotalMinutes do HH_PREVISTO e HH_CALCO
+    # diretamente no DuckDB se eles forem mapeados como structs/maps no Parquet.
+    # SE HH_PREVISTO e HH_CALCO são strings, a lógica seria diferente (parsing de string de data/hora).
+    # Com base na sua amostra de JSON, eles são objetos com 'TotalMinutes'.
+
+    query = f"""
+    WITH AtrasosCalculados AS (
+        SELECT
+            NR_AERONAVE_OPERADOR,
+            -- Converte a data e hora prevista e real para minutos totais do dia
+            -- Isso é uma simplificação. O ideal seria datetime_diff entre DATETIME completos.
+            -- Mas como temos apenas 'TotalMinutes' nos objetos HH_PREVISTO/HH_CALCO, usaremos isso.
+            -- Se as datas mudam (previsão em um dia, calço no dia seguinte), isso seria impreciso.
+            -- Para total precisão, o JSON de origem deveria ser parseado para datetime objects
+            -- ANTES de ser salvo no Parquet, com colunas de datetime.
+            (HH_CALCO.TotalMinutes - HH_PREVISTO.TotalMinutes) AS MinutosAtrasoBrutos
+        FROM read_parquet({arquivos_parquet})
+        {where_clause}
+    )
+    SELECT
+        NR_AERONAVE_OPERADOR,
+        SUM(CASE WHEN MinutosAtrasoBrutos > 0 THEN MinutosAtrasoBrutos ELSE 0 END) AS TotalMinutosAtraso
+    FROM AtrasosCalculados
+    GROUP BY NR_AERONAVE_OPERADOR
+    ORDER BY TotalMinutosAtraso DESC
+    LIMIT 1
+    """
+    try:
+        resultado = con.execute(query).fetchdf()
+        if not resultado.empty:
+            return {
+                "operador": resultado['NR_AERONAVE_OPERADOR'].iloc[0],
+                "total_minutos_atraso": int(resultado['TotalMinutosAtraso'].iloc[0]),
+                "ano": ano,
+                "aeroporto": aeroporto
+            }
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao obter operador com maiores atrasos: {e}")
+        print(f"DEBUG: Verifique se HH_PREVISTO.TotalMinutes e HH_CALCO.TotalMinutes são acessíveis no Parquet.")
+        return None
+    finally:
+        con.close()
+
+# --- Função de Parsing da Pergunta do Usuário com LLM (OpenAI - Aprimorada para Atrasos) ---
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=retry_if_result(lambda result: not result))
 def parse_pergunta_com_llm(pergunta_usuario):
     """
     Usa um LLM da OpenAI para extrair parâmetros de consulta da pergunta do usuário.
-    Agora com novas intenções para operadores mais movimentados.
-
-    Args:
-        pergunta_usuario (str): A pergunta em linguagem natural do usuário.
-
-    Returns:
-        dict: Um dicionário com os parâmetros extraídos, incluindo novas flags de intenção.
-              Retorna valores None para parâmetros não encontrados.
+    Agora com novas intenções para operadores mais movimentados, incluindo maiores atrasos.
     """
     prompt_messages = [
         {"role": "system", "content": f"""Você é um assistente especializado em extrair informações de perguntas sobre movimentações aeroportuárias.
         Sua única saída deve ser um objeto JSON.
-        Extraia os seguintes parâmetros da pergunta do usuário. Se um parâmetro não for mencionado, seu valor deve ser `null`.
-        Além disso, identifique intenções específicas para perguntas sobre rankings de aeroportos e operadores.
+        Extraia os seguintes parâmetros da pergunta do usuário. Se um parâmetro não for mencionado ou não se aplica, seu valor deve ser `null`.
+        Identifique intenções específicas para perguntas sobre rankings de aeroportos, operadores e destinos.
 
         Parâmetros a extrair:
-        - "aeroporto": (nome comum do aeroporto, ou código ICAO se já estiver presente, ex: "Recife", "Congonhas", "SBRF")
+        - "aeroporto": (código ICAO, ex: "SBRF". Para perguntas de "principal destino" sem aeroporto específico de origem, use `null` para este parâmetro. Ex: "destino mais acessado no Brasil" -> aeroporto: null)
         - "ano": (número inteiro)
-        - "mes": (número inteiro de 1 a 12, para meses como "janeiro" -> 1)
+        - "mes": (número inteiro de 1 a 12)
         - "tipo_movimento": ("P" para pouso/chegadas, "D" para decolagem/saídas)
         - "natureza": ("D" para doméstico, "I" para internacional)
         - "intencao_carga": (booleano: `true` se a pergunta mencionar "carga" ou "cargas", `false` caso contrário)
-        - "intencao_mais_movimentado": (booleano: `true` se a pergunta for sobre o "aeroporto mais movimentado do Brasil", "maior tráfego", "mais passageiros" DE AEROPORTO, `false` caso contrário)
-        - "intencao_mais_voos_internacionais": (booleano: `true` se a pergunta for sobre o "aeroporto com mais voos internacionais", `false` caso contrário)
-        - "intencao_maior_operador_pax": (booleano: `true` se a pergunta for sobre a "empresa que mais transportou passageiros", "operador com mais passageiros", `false` caso contrário)
-        - "intencao_maior_operador_carga": (booleano: `true` se a pergunta for sobre a "empresa que mais transportou cargas", "operador com mais cargas", `false` caso contrário)
-        - "intencao_principal_destino": (booleano: `true` se a pergunta for sobre o "principal destino", "destino mais acessado", "local de destino", `false` caso contrário)
+        - "intencao_mais_movimentado": (booleano: `true` para "aeroporto mais movimentado", "maior tráfego", "mais passageiros" DE AEROPORTO, `false` caso contrário)
+        - "intencao_mais_voos_internacionais": (booleano: `true` para "aeroporto com mais voos internacionais", `false` caso contrário)
+        - "intencao_maior_operador_pax": (booleano: `true` para "empresa que mais transportou passageiros", "operador com mais passageiros", `false` caso contrário)
+        - "intencao_maior_operador_carga": (booleano: `true` para "empresa que mais transportou cargas", "operador com mais cargas", `false` caso contrário)
+        - "intencao_principal_destino": (booleano: `true` para "principal destino", "destino mais acessado", "local de destino", `false` caso contrário)
+        - "intencao_maiores_atrasos": (booleano: `true` se a pergunta for sobre "maiores atrasos", "piores atrasos", "empresa mais atrasada", `false` caso contrário) # NOVA LINHA AQUI
 
-        Prioridade de intenções: Se houver intenções de ranking (mais movimentado, mais voos internacionais, maior operador), os outros parâmetros (aeroporto, mes, tipo_movimento, natureza, intencao_carga) podem ser null, a menos que o ano ou um aeroporto específico (para operador) seja mencionado.
+        Prioridade de intenções: Se uma intenção de ranking (mais movimentado, mais voos internacionais, maior operador, principal destino, maiores atrasos) for `true`, os outros parâmetros (mes, tipo_movimento, natureza, intencao_carga) podem ser `null`, a menos que o ano ou um aeroporto específico (para operador/destino/atraso) seja mencionado.
 
         Exemplos de saída JSON:
         - Pergunta: "Qual o destino mais acessado no Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual o destino mais acessado no Brasil em 2022?"
-          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual foi o principal destino para o aeroporto de Brasília em 2024?"
-          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual o principal local de destino para os voos do aeroporto de Salvador?"
-          Saída: {{"aeroporto": "Salvador", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+          Saída: {{"aeroporto": "Salvador", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual a empresa que mais transportou passageiros em 2024?"
         - Pergunta: "Qual o número de passageiros no aeroporto de Recife em 2023?"
-          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
+          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual aeroporto mais movimentado do Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual a empresa que mais transportou passageiros em 2024?"
-          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": true, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
+          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": true, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false}}
         - Pergunta: "Qual o operador que mais transportou cargas em Brasília no último ano?"
-          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": true, "intencao_principal_destino": false}}
+          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": true, "intencao_principal_destino": false, "intencao_maiores_atrasos": false}}
+        - Pergunta: "Qual foi o principal destino para o aeroporto de Brasília em 2024?"
+          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
+        - Pergunta: "Qual o destino mais acessado no Brasil em 2022?"
+          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
+        - Pergunta: "Qual o principal local de destino para os voos do aeroporto de Salvador?"
+          Saída: {{"aeroporto": "Salvador", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
+        - Pergunta: "Qual o destino mais acessado no Brasil?"
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false}}
+        - Pergunta: "Qual a empresa com maiores atrasos em Brasília?" # NOVO EXEMPLO AQUI
+          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": true}}
+        - Pergunta: "Qual o operador com maiores atrasos no Brasil em 2024?" # NOVO EXEMPLO AQUI
+          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": true}}
         """},
         {"role": "user", "content": pergunta_usuario}
     ]
@@ -690,7 +785,8 @@ def parse_pergunta_com_llm(pergunta_usuario):
 
         # Garante que as novas intenções são booleanos
         for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais",
-                    "intencao_maior_operador_pax", "intencao_maior_operador_carga", "intencao_principal_destino"]:
+                    "intencao_maior_operador_pax", "intencao_maior_operador_carga",
+                    "intencao_principal_destino", "intencao_maiores_atrasos"]: # CHAVE ADICIONADA AQUI
             if key not in params or not isinstance(params[key], bool):
                 params[key] = False
         
@@ -698,7 +794,7 @@ def parse_pergunta_com_llm(pergunta_usuario):
                       "intencao_carga", "intencao_mais_movimentado",
                       "intencao_mais_voos_internacionais",
                       "intencao_maior_operador_pax", "intencao_maior_operador_carga",
-                      "intencao_principal_destino"}
+                      "intencao_principal_destino", "intencao_maiores_atrasos"} # CHAVE ADICIONADA AQUI
         parsed_params = {k: v for k, v in params.items() if k in valid_keys}
 
         return parsed_params
