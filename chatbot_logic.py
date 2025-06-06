@@ -229,6 +229,34 @@ aeroporto_nome_para_icao = {
     "são josé do rio preto": "SBSR",
 }
 
+# --- Dicionário de Mapeamento de Códigos ICAO para Nomes de Operadores ---
+operador_icao_para_nome = {
+    "ABJ": "Abaeté",
+    "ACN": "Azul Conecta",
+    "AEB": "Avion Express Brasil",
+    "AFR": "Air France",
+    "ASO": "Aerosul",
+    "AZU": "Azul",
+    "BPC": "Braspress",
+    "BRS": "Força Aérea Brasileira",
+    "DLH": "Lufthansa",
+    "DUX": "Dux Express",
+    "GLO": "Gol",
+    "KLM": "KLM",
+    "LTG": "LATAM Cargo",
+    "MWM": "Modern Logistics",
+    "OMI": "Omni Táxi Aéreo",
+    "PAM": "MAP Linhas Aéreas",
+    "PTB": "Voepass",
+    "RIM": "Rima Táxi Aéreo",
+    "SID": "Sideral",
+    "SUL": "ASTA",
+    "TAM": "LATAM Brasil",
+    "TAP": "TAP Air Portugal",
+    "TOT": "Total Express",
+    "TTL": "Total"
+}
+
 # --- Dicionário de Mapeamento de Números de Mês para Nomes ---
 mes_numero_para_nome = {
     1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
@@ -242,7 +270,6 @@ def formatar_numero_br(valor):
 
 # --- Função para obter o último ano disponível nos dados ---
 def obter_ultimo_ano_disponivel(pasta_parquet):
-    # ... (código existente da função) ...
     if not os.path.exists(pasta_parquet):
         return None
     
@@ -262,8 +289,15 @@ def obter_ultimo_ano_disponivel(pasta_parquet):
         con.close()
 
 # --- Função de Consulta DuckDB (inalterada) ---
-def consultar_movimentacoes_aeroportuarias(pasta_parquet, aeroporto=None, ano=None, mes=None, tipo_movimento=None, natureza=None, tipo_consulta="passageiros"):
-    # ... (código existente da função) ...
+def consultar_movimentacoes_aeroportuarias(
+    pasta_parquet,
+    aeroporto=None,
+    ano=None,
+    mes=None,
+    tipo_movimento=None,
+    natureza=None,
+    tipo_consulta="passageiros"
+):
     if not os.path.exists(pasta_parquet):
         return pd.DataFrame()
 
@@ -312,9 +346,8 @@ def consultar_movimentacoes_aeroportuarias(pasta_parquet, aeroporto=None, ano=No
     finally:
         con.close()
 
-# --- NOVA FUNÇÃO: Obter Aeroporto Mais Movimentado ---
+# --- NOVA FUNÇÃO: Obter Aeroporto Mais Movimentado (inalterada) ---
 def obter_aeroporto_mais_movimentado(pasta_parquet, ano=None):
-    # ... (código existente da função) ...
     if not os.path.exists(pasta_parquet):
         return None
 
@@ -355,9 +388,8 @@ def obter_aeroporto_mais_movimentado(pasta_parquet, ano=None):
     finally:
         con.close()
 
-# --- NOVA FUNÇÃO: Obter Aeroporto com Mais Voos Internacionais ---
+# --- NOVA FUNÇÃO: Obter Aeroporto com Mais Voos Internacionais (inalterada) ---
 def obter_aeroporto_mais_voos_internacionais(pasta_parquet, ano=None):
-    # ... (código existente da função) ...
     if not os.path.exists(pasta_parquet):
         return None
 
@@ -398,16 +430,186 @@ def obter_aeroporto_mais_voos_internacionais(pasta_parquet, ano=None):
     finally:
         con.close()
 
+# --- NOVA FUNÇÃO: Obter Operador Mais Passageiros ---
+def obter_operador_mais_passageiros(pasta_parquet, ano=None, aeroporto=None):
+    """
+    Retorna o operador com o maior número total de passageiros para o ano/aeroporto especificado.
+    Se o ano for None, usa o último ano disponível.
+    """
+    if not os.path.exists(pasta_parquet):
+        return None
 
-# --- Função de Parsing da Pergunta do Usuário com LLM (OpenAI - Aprimorada para Novas Intenções) ---
+    if ano is None:
+        ano = obter_ultimo_ano_disponivel(pasta_parquet)
+        if ano is None:
+            return None
+
+    con = duckdb.connect(database=':memory:', read_only=False)
+    arquivos_parquet = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith('.parquet')]
+
+    if not arquivos_parquet:
+        con.close()
+        return None
+    
+    condicoes = [f"ANO = {ano}"]
+    if aeroporto:
+        condicoes.append(f"NR_AEROPORTO_REFERENCIA = '{aeroporto.upper()}'")
+    where_clause = "WHERE " + " AND ".join(condicoes) if condicoes else ""
+
+    query = f"""
+    SELECT
+        NR_AERONAVE_OPERADOR,
+        SUM(QT_PAX_LOCAL + QT_PAX_CONEXAO_DOMESTICO + QT_PAX_CONEXAO_INTERNACIONAL) AS TotalPassageirosOperador
+    FROM read_parquet({arquivos_parquet})
+    {where_clause}
+    GROUP BY NR_AERONAVE_OPERADOR
+    ORDER BY TotalPassageirosOperador DESC
+    LIMIT 1
+    """
+    try:
+        resultado = con.execute(query).fetchdf()
+        if not resultado.empty:
+            return {
+                "operador": resultado['NR_AERONAVE_OPERADOR'].iloc[0],
+                "total_passageiros": int(resultado['TotalPassageirosOperador'].iloc[0]),
+                "ano": ano,
+                "aeroporto": aeroporto
+            }
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao obter operador com mais passageiros: {e}")
+        return None
+    finally:
+        con.close()
+
+# --- NOVA FUNÇÃO: Obter Operador Mais Cargas ---
+def obter_operador_mais_cargas(pasta_parquet, ano=None, aeroporto=None):
+    """
+    Retorna o operador com o maior número total de cargas para o ano/aeroporto especificado.
+    Se o ano for None, usa o último ano disponível.
+    """
+    if not os.path.exists(pasta_parquet):
+        return None
+
+    if ano is None:
+        ano = obter_ultimo_ano_disponivel(pasta_parquet)
+        if ano is None:
+            return None
+
+    con = duckdb.connect(database=':memory:', read_only=False)
+    arquivos_parquet = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith('.parquet')]
+
+    if not arquivos_parquet:
+        con.close()
+        return None
+    
+    condicoes = [f"ANO = {ano}"]
+    if aeroporto:
+        condicoes.append(f"NR_AEROPORTO_REFERENCIA = '{aeroporto.upper()}'")
+    where_clause = "WHERE " + " AND ".join(condicoes) if condicoes else ""
+
+    query = f"""
+    SELECT
+        NR_AERONAVE_OPERADOR,
+        SUM(QT_CARGA) AS TotalCargasOperador
+    FROM read_parquet({arquivos_parquet})
+    {where_clause}
+    GROUP BY NR_AERONAVE_OPERADOR
+    ORDER BY TotalCargasOperador DESC
+    LIMIT 1
+    """
+    try:
+        resultado = con.execute(query).fetchdf()
+        if not resultado.empty:
+            return {
+                "operador": resultado['NR_AERONAVE_OPERADOR'].iloc[0],
+                "total_cargas": int(resultado['TotalCargasOperador'].iloc[0]),
+                "ano": ano,
+                "aeroporto": aeroporto
+            }
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao obter operador com mais cargas: {e}")
+        return None
+    finally:
+        con.close()
+
+# --- NOVA FUNÇÃO: Obter Principal Destino ---
+def obter_principal_destino(pasta_parquet, aeroporto_origem=None, ano=None):
+    """
+    Retorna o principal destino (ou origem) para um dado aeroporto ou para o Brasil,
+    para o ano especificado (ou último ano disponível).
+    Conta o número de voos para cada NR_VOO_OUTRO_AEROPORTO.
+    """
+    if not os.path.exists(pasta_parquet):
+        return None
+
+    if ano is None:
+        ano = obter_ultimo_ano_disponivel(pasta_parquet)
+        if ano is None:
+            return None
+
+    con = duckdb.connect(database=':memory:', read_only=False)
+    arquivos_parquet = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith('.parquet')]
+
+    if not arquivos_parquet:
+        con.close()
+        return None
+    
+    condicoes = [f"ANO = {ano}"]
+    # Se um aeroporto de origem for especificado, filtramos por ele.
+    # Caso contrário, consideraremos todos os aeroportos (Brasil).
+    if aeroporto_origem:
+        condicoes.append(f"NR_AEROPORTO_REFERENCIA = '{aeroporto_origem.upper()}'")
+    
+    where_clause = "WHERE " + " AND ".join(condicoes) if condicoes else ""
+
+    query = f"""
+    SELECT
+        NR_VOO_OUTRO_AEROPORTO,
+        COUNT(*) AS TotalVoos
+    FROM read_parquet({arquivos_parquet})
+    {where_clause}
+    GROUP BY NR_VOO_OUTRO_AEROPORTO
+    ORDER BY TotalVoos DESC
+    LIMIT 1
+    """
+    try:
+        resultado = con.execute(query).fetchdf()
+        if not resultado.empty:
+            # Retorna o código ICAO do destino, o total de voos e o ano/aeroporto de referência
+            return {
+                "destino_icao": resultado['NR_VOO_OUTRO_AEROPORTO'].iloc[0],
+                "total_voos": int(resultado['TotalVoos'].iloc[0]),
+                "ano": ano,
+                "aeroporto_origem": aeroporto_origem # Para exibir na resposta
+            }
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao obter principal destino: {e}")
+        return None
+    finally:
+        con.close()
+
+# --- Função de Parsing da Pergunta do Usuário com LLM (OpenAI - Aprimorada para Operadores) ---
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=retry_if_result(lambda result: not result))
 def parse_pergunta_com_llm(pergunta_usuario):
-    # ... (código existente da função) ...
+    """
+    Usa um LLM da OpenAI para extrair parâmetros de consulta da pergunta do usuário.
+    Agora com novas intenções para operadores mais movimentados.
+
+    Args:
+        pergunta_usuario (str): A pergunta em linguagem natural do usuário.
+
+    Returns:
+        dict: Um dicionário com os parâmetros extraídos, incluindo novas flags de intenção.
+              Retorna valores None para parâmetros não encontrados.
+    """
     prompt_messages = [
         {"role": "system", "content": f"""Você é um assistente especializado em extrair informações de perguntas sobre movimentações aeroportuárias.
         Sua única saída deve ser um objeto JSON.
         Extraia os seguintes parâmetros da pergunta do usuário. Se um parâmetro não for mencionado, seu valor deve ser `null`.
-        Além disso, identifique intenções específicas para perguntas sobre rankings.
+        Além disso, identifique intenções específicas para perguntas sobre rankings de aeroportos e operadores.
 
         Parâmetros a extrair:
         - "aeroporto": (nome comum do aeroporto, ou código ICAO se já estiver presente, ex: "Recife", "Congonhas", "SBRF")
@@ -416,20 +618,32 @@ def parse_pergunta_com_llm(pergunta_usuario):
         - "tipo_movimento": ("P" para pouso/chegadas, "D" para decolagem/saídas)
         - "natureza": ("D" para doméstico, "I" para internacional)
         - "intencao_carga": (booleano: `true` se a pergunta mencionar "carga" ou "cargas", `false` caso contrário)
-        - "intencao_mais_movimentado": (booleano: `true` se a pergunta for sobre o "aeroporto mais movimentado do Brasil", "maior tráfego", "mais passageiros", `false` caso contrário)
+        - "intencao_mais_movimentado": (booleano: `true` se a pergunta for sobre o "aeroporto mais movimentado do Brasil", "maior tráfego", "mais passageiros" DE AEROPORTO, `false` caso contrário)
         - "intencao_mais_voos_internacionais": (booleano: `true` se a pergunta for sobre o "aeroporto com mais voos internacionais", `false` caso contrário)
+        - "intencao_maior_operador_pax": (booleano: `true` se a pergunta for sobre a "empresa que mais transportou passageiros", "operador com mais passageiros", `false` caso contrário)
+        - "intencao_maior_operador_carga": (booleano: `true` se a pergunta for sobre a "empresa que mais transportou cargas", "operador com mais cargas", `false` caso contrário)
+        - "intencao_principal_destino": (booleano: `true` se a pergunta for sobre o "principal destino", "destino mais acessado", "local de destino", `false` caso contrário)
 
-        Prioridade de intenções: Se houver "mais movimentado" ou "mais voos internacionais", os outros parâmetros (aeroporto, mes, tipo_movimento, natureza, intencao_carga) podem ser null, a menos que o ano seja especificado.
+        Prioridade de intenções: Se houver intenções de ranking (mais movimentado, mais voos internacionais, maior operador), os outros parâmetros (aeroporto, mes, tipo_movimento, natureza, intencao_carga) podem ser null, a menos que o ano ou um aeroporto específico (para operador) seja mencionado.
 
         Exemplos de saída JSON:
+        - Pergunta: "Qual o destino mais acessado no Brasil?"
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+        - Pergunta: "Qual o destino mais acessado no Brasil em 2022?"
+          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+        - Pergunta: "Qual foi o principal destino para o aeroporto de Brasília em 2024?"
+          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+        - Pergunta: "Qual o principal local de destino para os voos do aeroporto de Salvador?"
+          Saída: {{"aeroporto": "Salvador", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true}}
+        - Pergunta: "Qual a empresa que mais transportou passageiros em 2024?"
         - Pergunta: "Qual o número de passageiros no aeroporto de Recife em 2023?"
-          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false}}
+          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
         - Pergunta: "Qual aeroporto mais movimentado do Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false}}
-        - Pergunta: "Aeroporto com maior tráfego em 2024?"
-          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false}}
-        - Pergunta: "Qual aeroporto com mais voos internacionais em 2023?"
-          Saída: {{"aeroporto": null, "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": true}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
+        - Pergunta: "Qual a empresa que mais transportou passageiros em 2024?"
+          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": true, "intencao_maior_operador_carga": false, "intencao_principal_destino": false}}
+        - Pergunta: "Qual o operador que mais transportou cargas em Brasília no último ano?"
+          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": true, "intencao_principal_destino": false}}
         """},
         {"role": "user", "content": pergunta_usuario}
     ]
@@ -475,14 +689,16 @@ def parse_pergunta_com_llm(pergunta_usuario):
                 params[key] = None
 
         # Garante que as novas intenções são booleanos
-        if 'intencao_carga' not in params or not isinstance(params['intencao_carga'], bool):
-            params['intencao_carga'] = False
-        if 'intencao_mais_movimentado' not in params or not isinstance(params['intencao_mais_movimentado'], bool):
-            params['intencao_mais_movimentado'] = False
-        if 'intencao_mais_voos_internacionais' not in params or not isinstance(params['intencao_mais_voos_internacionais'], bool):
-            params['intencao_mais_voos_internacionais'] = False
+        for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais",
+                    "intencao_maior_operador_pax", "intencao_maior_operador_carga", "intencao_principal_destino"]:
+            if key not in params or not isinstance(params[key], bool):
+                params[key] = False
         
-        valid_keys = {"aeroporto", "ano", "mes", "tipo_movimento", "natureza", "intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais"}
+        valid_keys = {"aeroporto", "ano", "mes", "tipo_movimento", "natureza",
+                      "intencao_carga", "intencao_mais_movimentado",
+                      "intencao_mais_voos_internacionais",
+                      "intencao_maior_operador_pax", "intencao_maior_operador_carga",
+                      "intencao_principal_destino"}
         parsed_params = {k: v for k, v in params.items() if k in valid_keys}
 
         return parsed_params

@@ -11,15 +11,20 @@ from chatbot_logic import (
     consultar_movimentacoes_aeroportuarias,
     obter_aeroporto_mais_movimentado,
     obter_aeroporto_mais_voos_internacionais,
+    obter_operador_mais_passageiros,
+    obter_operador_mais_cargas,
+    obter_principal_destino, 
+    obter_ultimo_ano_disponivel,
     formatar_numero_br,
     aeroporto_nome_para_icao,
-    mes_numero_para_nome
+    mes_numero_para_nome,
+    operador_icao_para_nome
 )
 
 # Configuração da página Streamlit
 st.set_page_config(
-    page_title="Chatbot de Movimentações Aeroportuárias",
-    page_icon="✈️",
+    page_title="Chatbot de Movimentações Aeroportuárias - IBI",
+    page_icon="images/favicon.png", # Caminho para o seu favicon
     layout="centered",
     initial_sidebar_state="auto"
 )
@@ -27,11 +32,57 @@ st.set_page_config(
 # Caminho para a pasta de arquivos Parquet
 PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
 
+
+# --- Adicionar Logo no Topo da Página (ANTES DO TÍTULO) ---
+LOGO_PATH = "images/logo.svg" # Certifique-se de que este caminho está correto
+
+# --- CSS Personalizado para Centralizar e Ajustar Largura da Imagem ---
+# O Streamlit renderiza imagens dentro de um contêiner div.
+# Precisamos sobrescrever o estilo desse contêiner.
+st.markdown(
+    """
+    <style>
+    /* Estilo para corrigir a centralização da imagem (stImage) */
+    div[data-testid="stFullScreenFrame"] {
+        margin: 0 auto;
+        display: flex;
+        justify-content: center;
+    }
+    /* Estilo para o contêiner direto da imagem (stImage) */
+    .stImage {
+        width: 100%; /* Faz o contêiner da imagem ocupar 100% da largura da coluna */
+        display: flex; /* Habilita flexbox para centralização */
+        justify-content: center; /* Centraliza a imagem horizontalmente */
+        align-items: center; /* Centraliza verticalmente (se necessário, para a logo não é crucial) */
+        margin-top: 1rem; /* Espaço acima da imagem */
+        margin-bottom: 1rem; /* Espaço abaixo da imagem */
+    }
+
+    /* Estilo para a tag <img> real dentro do contêiner .stImage */
+    .stImage img {
+        width: 100%; /* Faz a imagem ocupar 100% da largura do seu contêiner pai (.stImage) */
+        max-width: 500px; /* Opcional: Define uma largura máxima para a imagem em si (ajuste este valor) */
+        height: auto; /* Mantém a proporção da imagem */
+        display: block; /* Garante que a imagem se comporta como um bloco para margin: auto */
+        /* Removido margin: auto; daqui, pois o flexbox do .stImage já centraliza */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Verificar se a logo existe antes de tentar exibi-la
+if os.path.exists(LOGO_PATH):
+    # Não use 'width' ou 'use_column_width' aqui, o CSS vai controlar
+    st.image(LOGO_PATH)
+else:
+    st.warning(f"Logo não encontrada em: {LOGO_PATH}")
+
 # --- Título e Descrição do Chatbot ---
 st.title("✈️ Chatbot de Movimentações Aeroportuárias")
 st.markdown(
     """
-    #### Olá! Sou seu assitente virtual do **Observatório de Dados** do Instituto Brasileiro de Infraestrutura.
+    #### Olá! Sou seu assistente virtual do *Observatório de Dados* do Instituto Brasileiro de Infraestrutura.
     ---
     Fui treinado com dados das movimentações aeroportuárias de 2019 à 2024.
 
@@ -43,6 +94,14 @@ st.markdown(
     > Qual o aeroporto mais movimentado do Brasil?
     >
     > Qual aeroporto com mais voos internacionais?
+    >
+    > Qual a empresa que mais transportou passageiros em 2024?
+    >
+    > Qual o operador que mais transportou cargas em Brasília?
+    >
+    > Qual foi o principal destino para o aeroporto de Brasília em 2024?
+    >
+    > Qual o destino mais acessado no Brasil?
     """
 )
 
@@ -50,21 +109,18 @@ st.markdown(
 if not os.path.exists(PASTA_ARQUIVOS_PARQUET) or not os.listdir(PASTA_ARQUIVOS_PARQUET):
     st.error("Atenção: A pasta 'dados_aeroportuarios_parquet' não foi encontrada ou está vazia.")
     st.info("Por favor, execute o script `conversor_json_parquet.py` para gerar os arquivos Parquet e coloque-os na pasta.")
-    st.stop() # Para a execução do Streamlit se os dados não estiverem prontos
+    st.stop()
 
 # --- Interface do Chat (Histórico de Conversa) ---
-# Inicializa o histórico de chat na sessão do Streamlit
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Exibe mensagens do histórico de chat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # --- Entrada do Usuário ---
 if prompt := st.chat_input("Pergunte-me sobre movimentações aeroportuárias..."):
-    # Adiciona a mensagem do usuário ao histórico
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -72,24 +128,32 @@ if prompt := st.chat_input("Pergunte-me sobre movimentações aeroportuárias...
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             resposta_chatbot = ""
-            parametros = parse_pergunta_com_llm(prompt) # Chamada ao LLM
+            parametros = parse_pergunta_com_llm(prompt)
 
-            # --- Lógica de Tratamento de Entidades, Intenções e Geração de Resposta ---
+            # --- Tratamento de Entidades e Novas Intenções ---
             feedback_usuario = []
-            if not parametros or not any(parametros.get(k) for k in ["aeroporto", "ano", "mes", "tipo_movimento", "natureza", "intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais"]):
+            if not parametros or not (
+                any(parametros.get(k) for k in ["aeroporto", "ano", "mes", "tipo_movimento", "natureza", "intencao_carga"]) or
+                parametros.get('intencao_mais_movimentado') or
+                parametros.get('intencao_mais_voos_internacionais') or
+                parametros.get('intencao_maior_operador_pax') or
+                parametros.get('intencao_maior_operador_carga')
+            ):
                 feedback_usuario.append("Não consegui extrair informações relevantes da sua pergunta.")
             else:
-                for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais"]:
+                for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais", "intencao_maior_operador_pax", "intencao_maior_operador_carga"]:
                     if key not in parametros or not isinstance(parametros[key], bool):
                         parametros[key] = False
 
-                if not (parametros['intencao_mais_movimentado'] or parametros['intencao_mais_voos_internacionais']):
+                # Se não for uma das perguntas de ranking, exige aeroporto e ano para perguntas detalhadas
+                if not (parametros['intencao_mais_movimentado'] or parametros['intencao_mais_voos_internacionais'] or
+                        parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga']):
                     if not parametros.get('aeroporto'):
                         feedback_usuario.append("Não identifiquei o aeroporto. Poderia especificar o nome ou código ICAO?")
                     if not parametros.get('ano'):
                         if not (parametros.get('aeroporto') and parametros.get('mes')):
                             feedback_usuario.append("Não identifiquei o ano. Poderia especificar o ano da movimentação?")
-                    
+                
             if feedback_usuario:
                 resposta_chatbot = f"Desculpe. {' '.join(feedback_usuario)} Por favor, tente novamente de forma mais clara."
             else:
@@ -100,7 +164,7 @@ if prompt := st.chat_input("Pergunte-me sobre movimentações aeroportuárias...
                     except (ValueError, TypeError):
                         parametros['mes'] = None
                 
-                # Lógica para Responder às Novas Perguntas de Ranking
+                # --- Lógica para Responder às Novas Perguntas de Ranking (Aeroportos e Operadores) ---
                 if parametros['intencao_mais_movimentado']:
                     ano_referencia = parametros.get('ano')
                     resultado_ranking = obter_aeroporto_mais_movimentado(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia)
@@ -120,6 +184,69 @@ if prompt := st.chat_input("Pergunte-me sobre movimentações aeroportuárias...
                         resposta_chatbot = f"No ano de {resultado_ranking['ano']}, o aeroporto com mais voos internacionais foi **{aeroporto_nome.title()}**, com **{total_voos_formatado}** voos internacionais registrados."
                     else:
                         resposta_chatbot = f"Não foi possível determinar o aeroporto com mais voos internacionais. Verifique os dados para o ano {ano_referencia if ano_referencia else 'disponível'}."
+
+                elif parametros['intencao_maior_operador_pax']:
+                    ano_referencia = parametros.get('ano')
+                    aeroporto_filtro = parametros.get('aeroporto')
+                    resultado_operador = obter_operador_mais_passageiros(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
+                    if resultado_operador:
+                        ano_str = f" em {resultado_operador['ano']}" if resultado_operador['ano'] else ""
+                        aeroporto_str = ""
+                        if aeroporto_filtro:
+                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
+                            aeroporto_str = f" no aeroporto de {nome_aeroporto_exibicao.title()}"
+                        
+                        total_pax_formatado = formatar_numero_br(resultado_operador['total_passageiros'])
+                        
+                        # --- ALTERAÇÃO AQUI: Mapear código do operador para nome completo ---
+                        nome_operador_completo = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
+                        
+                        resposta_chatbot = f"A empresa que mais transportou passageiros{aeroporto_str}{ano_str} foi a **{nome_operador_completo}**, com um total de **{total_pax_formatado}** passageiros."
+                    else:
+                        resposta_chatbot = f"Não foi possível determinar a empresa que mais transportou passageiros para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+
+                elif parametros['intencao_maior_operador_carga']:
+                    ano_referencia = parametros.get('ano')
+                    aeroporto_filtro = parametros.get('aeroporto')
+                    resultado_operador = obter_operador_mais_cargas(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
+                    if resultado_operador:
+                        ano_str = f" em {resultado_operador['ano']}" if resultado_operador['ano'] else ""
+                        aeroporto_str = ""
+                        if aeroporto_filtro:
+                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
+                            aeroporto_str = f" no aeroporto de {nome_aeroporto_exibicao.title()}"
+
+                        total_cargas_formatado = formatar_numero_br(resultado_operador['total_cargas'])
+                        
+                        # --- ALTERAÇÃO AQUI: Mapear código do operador para nome completo ---
+                        nome_operador_completo = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
+
+                        resposta_chatbot = f"A empresa que mais transportou cargas{aeroporto_str}{ano_str} foi a **{nome_operador_completo}**, com um total de **{total_cargas_formatado}** kg de cargas."
+                    else:
+                        resposta_chatbot = f"Não foi possível determinar a empresa que mais transportou cargas para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+
+
+                elif parametros['intencao_principal_destino']: # NOVO BLOCO AQUI
+                    ano_referencia = parametros.get('ano')
+                    aeroporto_origem_filtro = parametros.get('aeroporto') # Aeroporto de origem/referência
+                    
+                    resultado_destino = obter_principal_destino(PASTA_ARQUIVOS_PARQUET, aeroporto_origem=aeroporto_origem_filtro, ano=ano_referencia)
+                    
+                    if resultado_destino and resultado_destino['destino_icao'] is not None:
+                        # Mapear o código ICAO do destino para o nome do aeroporto
+                        destino_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['destino_icao'].upper()), resultado_destino['destino_icao'].upper())
+                        
+                        total_voos_formatado = formatar_numero_br(resultado_destino['total_voos'])
+                        
+                        frase_aeroporto = ""
+                        if aeroporto_origem_filtro: # Se um aeroporto de origem foi especificado
+                            nome_aeroporto_origem_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_origem_filtro.upper()), aeroporto_origem_filtro.upper())
+                            frase_aeroporto = f" para o aeroporto de **{nome_aeroporto_origem_exibicao.title()}**"
+
+                        resposta_chatbot = f"No ano de {resultado_destino['ano']}{frase_aeroporto}, o principal destino foi **{destino_nome.title()}**, com um total de **{total_voos_formatado}** voos."
+                    else:
+                        resposta_chatbot = f"Não foi possível determinar o principal destino para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_origem_filtro if aeroporto_origem_filtro else 'todos'})."
+                
                 
                 else: # Lógica para perguntas gerais de volume/carga
                     tipo_consulta_db = "passageiros"
@@ -138,7 +265,8 @@ if prompt := st.chat_input("Pergunte-me sobre movimentações aeroportuárias...
 
                     if resultados_df is not None and not resultados_df.empty:
                         total_valor = resultados_df['TotalValor'].iloc[0]
-                        resposta_semantica = f"Em "
+
+                        resposta_semantica = f"No "
                         
                         if parametros.get('mes'):
                             nome_do_mes = mes_numero_para_nome.get(parametros['mes'], str(parametros['mes']))
