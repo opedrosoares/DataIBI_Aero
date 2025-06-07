@@ -1,11 +1,12 @@
 import streamlit as st
 import os
 import sys
+import pandas as pd
 
-# Adiciona o diretório atual ao sys.path para que chatbot_logic.py possa ser importado
+# Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
 sys.path.append(os.path.dirname(__file__))
 
-# Importa todas as funções e variáveis necessárias do chatbot_logic.py
+# Importa as funções de lógica do chatbot
 from chatbot_logic import (
     parse_pergunta_com_llm,
     consultar_movimentacoes_aeroportuarias,
@@ -22,83 +23,74 @@ from chatbot_logic import (
     obter_operador_maiores_atrasos
 )
 
+# --- NOVO: Importa as funções de banco de dados ---
+from database_logic import init_db, save_conversation, get_all_conversations_as_df
+
 # --- Configuração da página Streamlit ---
 st.set_page_config(
     page_title="Chatbot de Movimentações Aeroportuárias - IBI",
-    page_icon="images/favicon.png", # Caminho para o seu favicon
+    page_icon="images/favicon.png",
     layout="centered",
     initial_sidebar_state="auto"
 )
 
+# --- NOVO: Inicializa o banco de dados ao iniciar o app ---
+init_db()
+
 # Caminho para a pasta de arquivos Parquet
 PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
 
-# --- Obter o Último Ano Disponível (NOVA SEÇÃO AQUI) ---
-# Executa a função para obter o ano logo no carregamento do app
+# --- Obter o Último Ano Disponível ---
 ultimo_ano = obter_ultimo_ano_disponivel(PASTA_ARQUIVOS_PARQUET)
 if ultimo_ano is None:
     st.error("Não foi possível determinar o último ano disponível nos dados. Verifique a pasta de arquivos Parquet.")
-    st.stop() # Para o app se o ano não puder ser obtido
+    st.stop()
 
-# --- Adicionar Logo no Topo da Página (ANTES DO TÍTULO) ---
-LOGO_PATH = "images/logo.svg" # Certifique-se de que este caminho está correto
-
-# --- CSS Personalizado para Centralizar e Ajustar Largura da Imagem e Botões ---
+# --- Logo e CSS Personalizado (sem alterações) ---
+LOGO_PATH = "images/logo.svg"
 st.markdown(
     """
     <style>
-    /* Estilo para corrigir a centralização da imagem (stImage) */
-    /* Seletor robusto para o contêiner pai do conteúdo principal. */
     div[data-testid="stFullScreenFrame"] > div:first-child {
         margin: 0 auto;
-        display: table; /* Para que margin: auto funcione para centralizar o bloco */
-        width: 100%; /* Ocupa a largura total disponível */
-        max-width: 700px; /* Limita a largura do conteúdo principal */
+        display: table;
+        width: 100%;
+        max-width: 700px;
     }
-
-    /* Estilo para o contêiner direto da imagem (stImage) */
     .stImage {
-        width: 100%; /* Faz o contêiner da imagem ocupar 100% da largura da coluna */
-        display: flex; /* Habilita flexbox para centralização */
-        justify-content: center; /* Centraliza a imagem horizontalmente */
-        align-items: center; /* Centraliza verticalmente */
-        margin-top: 1rem; /* Espaço acima da imagem */
-        margin-bottom: 1rem; /* Espaço abaixo da imagem */
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
     }
-
-    /* Estilo para a tag <img> real dentro do contêiner .stImage */
     .stImage img {
-        width: 100%; /* Faz a imagem ocupar 100% da largura do seu contêiner pai (.stImage) */
-        max-width: 500px; /* Define uma largura máxima para a imagem em si (ajuste este valor) */
-        height: auto; /* Mantém a proporção da imagem */
-        display: block; /* Garante que a imagem se comporta como um bloco */
+        width: 100%;
+        max-width: 500px;
+        height: auto;
+        display: block;
     }
-
-    /* Estilo para alinhar o texto dos botões de ação à esquerda */
-    .stButton > button { /* Mira o botão real dentro do contêiner stButton */
-        text-align: left; /* Alinha o texto do botão à esquerda */
-        justify-content: flex-start; /* Alinha o conteúdo flex (se houver) à esquerda */
-        width: 100%; /* Garante que o botão ocupe toda a largura do seu contêiner */
+    .stButton > button {
+        text-align: left;
+        justify-content: flex-start;
+        width: 100%;
     }
-    
-    /* Centralizar o chat input */
-    div[data-testid="stForm"] { /* Contêiner do formulário de chat */
+    div[data-testid="stForm"] {
         margin-left: auto;
         margin-right: auto;
-        max-width: 700px; /* Ajusta para combinar com o max-width do conteúdo */
+        max-width: 700px;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-
-# Verificar se a logo existe antes de tentar exibi-la
 if os.path.exists(LOGO_PATH):
     st.image(LOGO_PATH)
 else:
     st.warning(f"Logo não encontrada em: {LOGO_PATH}")
 
-# --- Título e Descrição do Chatbot ---
+# --- Título e Descrição ---
 st.title("✈️ Chatbot de Movimentações Aeroportuárias")
 st.markdown(
     f"""
@@ -110,43 +102,38 @@ st.markdown(
     """
 )
 
-# --- Perguntas de Exemplo como Botões (AGORA DINÂMICAS) ---
+# --- Perguntas de Exemplo ---
 preset_questions = [
     f"Qual o volume de passageiros que chegaram em Recife em janeiro de {ultimo_ano}?",
     f"Total de carga transportada em Guarulhos em {ultimo_ano}?",
-    "Qual o aeroporto mais movimentado do Brasil?", # Não precisa de ano aqui, a função já usa ultimo_ano
-    "Qual aeroporto com mais voos internacionais?", # Não precisa de ano aqui
+    "Qual o aeroporto mais movimentado do Brasil?",
+    "Qual aeroporto com mais voos internacionais?",
     f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
     f"Qual o operador que mais transportou cargas em Brasília em {ultimo_ano}?",
     f"Qual foi o principal destino para o aeroporto de Brasília em {ultimo_ano}?",
-    "Qual o destino mais acessado no Brasil?", # Não precisa de ano aqui
+    "Qual o destino mais acessado no Brasil?",
     f"Qual a empresa com maiores atrasos em Brasília em {ultimo_ano}?",
     f"Qual o operador com maiores atrasos no Brasil em {ultimo_ano}?"
 ]
 
-# Inicializa o estado para armazenar o prompt de um botão
 if 'preset_prompt' not in st.session_state:
     st.session_state.preset_prompt = ""
 if 'process_preset_prompt' not in st.session_state:
     st.session_state.process_preset_prompt = False
 
-# Remover o contêiner com borda e o título "Experimente estas perguntas:"
-# Os botões serão exibidos diretamente aqui, cada um em sua própria linha (Streamlit padrão)
 for i, q in enumerate(preset_questions):
-    # Usamos st.button() diretamente. O estilo CSS definido acima cuidará do alinhamento do texto.
     if st.button(q, key=f"q_button_{i}", use_container_width=True):
         st.session_state.preset_prompt = q
         st.session_state.process_preset_prompt = True
-        st.rerun() # Reexecuta o script para processar o prompt
+        st.rerun()
 
-
-# Verifica se os arquivos Parquet existem antes de continuar
+# --- Verificação dos arquivos Parquet ---
 if not os.path.exists(PASTA_ARQUIVOS_PARQUET) or not os.listdir(PASTA_ARQUIVOS_PARQUET):
     st.error("Atenção: A pasta 'dados_aeroportuarios_parquet' não foi encontrada ou está vazia.")
     st.info("Por favor, execute o script `conversor_json_parquet.py` para gerar os arquivos Parquet e coloque-os na pasta.")
     st.stop()
 
-# --- Interface do Chat (Histórico de Conversa) ---
+# --- Interface do Chat (Histórico da Sessão Atual) ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -154,7 +141,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- Lógica para processar prompts, seja da entrada do usuário ou de um botão ---
+# --- Lógica principal do Chat ---
 current_prompt = None
 
 if prompt_from_input := st.chat_input("Pergunte-me sobre movimentações aeroportuárias..."):
@@ -171,10 +158,17 @@ if current_prompt:
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
+            # A lógica para gerar a resposta permanece a mesma
             resposta_chatbot = ""
             parametros = parse_pergunta_com_llm(current_prompt)
-
-            # --- Lógica de Tratamento de Entidades, Intenções e Geração de Resposta ---
+            
+            # [TODA A LÓGICA DE PROCESSAMENTO DA PERGUNTA E GERAÇÃO DA RESPOSTA VEM AQUI]
+            # [COLE AQUI A LÓGICA ORIGINAL DO SEU 'app.py' QUE FICA DENTRO DO 'with st.spinner("Pensando..."):' ]
+            # ...
+            # Para manter o exemplo conciso, vamos simular que a resposta foi gerada.
+            # No seu código final, você deve manter toda a sua lógica de `if/elif/else` para definir a `resposta_chatbot`.
+            
+            # --- Início da Lógica de Geração de Resposta (COPIADA DO SEU ARQUIVO ORIGINAL) ---
             feedback_usuario = []
             if not parametros or not (
                 any(parametros.get(k) for k in ["aeroporto", "ano", "mes", "tipo_movimento", "natureza", "intencao_carga"]) or
@@ -192,28 +186,18 @@ if current_prompt:
                     if key not in parametros or not isinstance(parametros[key], bool):
                         parametros[key] = False
 
-                # Verifica se é uma das perguntas de ranking que NÃO PRECISA de ano, se não for, pede o ano
-                # As intenções de ranking podem ter o ano como null (último ano disponível).
-                # A intenção de 'principal destino' e 'maiores atrasos' PODE ter aeroporto nulo (para 'no Brasil').
-                # Portanto, a condição para pedir aeroporto e ano precisa ser mais granular.
-                
-                # Se não for uma das perguntas de ranking...
                 if not (parametros['intencao_mais_movimentado'] or parametros['intencao_mais_voos_internacionais'] or
                         parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or
                         parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
-                    # Para perguntas "normais" de volume/carga, aeroporto e ano são geralmente essenciais.
                     if not parametros.get('aeroporto'):
                         feedback_usuario.append("Não identifiquei o aeroporto. Poderia especificar o nome ou código ICAO?")
                     if not parametros.get('ano'):
                         if not (parametros.get('aeroporto') and parametros.get('mes')):
                             feedback_usuario.append("Não identifiquei o ano. Poderia especificar o ano da movimentação?")
                 
-                # Para perguntas de ranking específicas que exigem aeroporto (como operador no aeroporto X)
-                # ou se o aeroporto for fornecido mas não mapeado para ICAO.
                 if (parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
                     if parametros.get('aeroporto') and (parametros.get('aeroporto').upper() not in aeroporto_nome_para_icao.values()):
-                        # Se o aeroporto foi extraído, mas não está no nosso mapeamento, e não é uma pergunta nacional
-                        if not (parametros['aeroporto'].lower() == "brasil" or parametros['aeroporto'] == "null"): # Assume que 'null' ou 'brasil' não exigem ICAO
+                        if not (parametros['aeroporto'].lower() == "brasil" or parametros['aeroporto'] == "null"):
                             feedback_usuario.append(f"O aeroporto '{parametros['aeroporto']}' não é reconhecido. Poderia usar um código ICAO ou nome mais comum?")
 
             if feedback_usuario:
@@ -289,9 +273,7 @@ if current_prompt:
                     
                     if resultado_destino and resultado_destino['destino_icao'] is not None:
                         destino_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['destino_icao'].upper()), resultado_destino['destino_icao'].upper())
-                        
                         total_voos_formatado = formatar_numero_br(resultado_destino['total_voos'])
-                        
                         frase_aeroporto_origem = ""
                         if aeroporto_origem_filtro:
                             nome_aeroporto_origem_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_origem_filtro.upper()), aeroporto_origem_filtro.upper())
@@ -301,20 +283,16 @@ if current_prompt:
                     else:
                         resposta_chatbot = f"Não foi possível determinar o principal destino para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_origem_filtro if aeroporto_origem_filtro else 'todos'})."
 
-                elif parametros['intencao_maiores_atrasos']: # NOVO BLOCO AQUI
+                elif parametros['intencao_maiores_atrasos']:
                     ano_referencia = parametros.get('ano')
                     aeroporto_filtro = parametros.get('aeroporto')
-                    
                     resultado_atrasos = obter_operador_maiores_atrasos(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
                     
                     if resultado_atrasos:
                         nome_operador_completo = operador_icao_para_nome.get(resultado_atrasos['operador'].upper(), resultado_atrasos['operador'].upper())
                         total_minutos_atraso = resultado_atrasos['total_minutos_atraso']
-                        
-                        # Converter minutos para horas e minutos para exibição amigável
                         horas = int(total_minutos_atraso // 60)
                         minutos = int(total_minutos_atraso % 60)
-
                         ano_str = f" em {resultado_atrasos['ano']}" if resultado_atrasos['ano'] else ""
                         aeroporto_str_exibicao = ""
                         if aeroporto_filtro:
@@ -325,7 +303,7 @@ if current_prompt:
                     else:
                         resposta_chatbot = f"Não foi possível determinar a empresa com maiores atrasos para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
                 
-                else: # Lógica para perguntas gerais de volume/carga
+                else: 
                     tipo_consulta_db = "passageiros"
                     if parametros.get('intencao_carga'):
                         tipo_consulta_db = "carga"
@@ -342,9 +320,7 @@ if current_prompt:
 
                     if resultados_df is not None and not resultados_df.empty:
                         total_valor = resultados_df['TotalValor'].iloc[0]
-
                         resposta_semantica = f"No "
-
                         if parametros.get('mes'):
                             nome_do_mes = mes_numero_para_nome.get(parametros['mes'], str(parametros['mes']))
                             resposta_semantica += f"mês de {nome_do_mes.capitalize()} de "
@@ -382,7 +358,7 @@ if current_prompt:
                         resposta_semantica += "."
                         resposta_chatbot = resposta_semantica.replace(", ,", ", ").replace("  ", " ").strip().replace(" .", ".")
 
-                    else: # Se a consulta ao DB retornar vazio
+                    else:
                         criterios = []
                         if parametros.get('aeroporto'):
                             aeroporto_nome_feedback = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == parametros['aeroporto'].upper()), parametros['aeroporto'].upper())
@@ -406,7 +382,24 @@ if current_prompt:
                             resposta_chatbot = f"Não foram encontrados dados com os critérios especificados. Para os critérios {', '.join(criterios)}: Verifique se os dados existem para esta combinação ou tente critérios de pesquisa mais amplos."
                         else:
                             resposta_chatbot = "Não foram encontrados dados com os critérios especificados. Por favor, tente uma pergunta diferente ou especifique mais detalhes."
+            # --- Fim da Lógica de Geração de Resposta ---
 
             # Exibe a resposta do chatbot na interface
             st.markdown(resposta_chatbot)
+            
+            # --- NOVO: Salva a conversa no banco de dados ---
+            if current_prompt and resposta_chatbot:
+                save_conversation(current_prompt, resposta_chatbot)
+            
+            # Adiciona a resposta ao histórico da sessão atual
             st.session_state.messages.append({"role": "assistant", "content": resposta_chatbot})
+
+# --- NOVO: Seção para exibir o histórico de conversas do banco de dados ---
+st.markdown("---")
+with st.expander("Ver Histórico de Conversas Salvas"):
+    history_df = get_all_conversations_as_df()
+    if not history_df.empty:
+        # Usamos st.dataframe para uma visualização em tabela interativa
+        st.dataframe(history_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("O histórico de conversas está vazio.")
