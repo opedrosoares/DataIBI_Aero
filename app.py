@@ -3,7 +3,8 @@ import os
 import sys
 import pandas as pd
 import random
-# O import de st.components.v1 foi removido, pois não é mais necessário
+import streamlit.components.v1 as components
+import base64
 
 # Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +34,13 @@ from chatbot_logic import (
 
 # Importa as funções de banco de dados
 from database_logic import init_db, save_conversation, get_all_conversations_as_df
+
+# --- Função para codificar imagem ---
+def get_image_as_base64(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
 
 # --- Configuração da página Streamlit ---
 st.set_page_config(
@@ -67,6 +75,7 @@ if ultimo_ano is None:
 # --- Logo e CSS Personalizado ---
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
+ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
 st.markdown(
     """
@@ -84,21 +93,40 @@ st.markdown(
     .stApp > footer {
         display: none;
     }
+
+    .stElementContainer.st-key-show_more button {
+        width: auto;
+        border-radius: 50%;
+    }
+    .stElementContainer.st-key-show_more .stButton {
+        text-align: center;
+    }
     
     </style>
     """,
     unsafe_allow_html=True
 )
 if os.path.exists(LOGO_PATH):
-    if LOGO_PATH.endswith('.svg'):
-        st.image(LOGO_PATH)
-    else:
-        st.image(LOGO_PATH)
+    st.image(LOGO_PATH)
 else:
     st.warning(f"Logo não encontrada em: {LOGO_PATH}")
 
 # --- Título e Descrição ---
-st.title("✈️ Chatbot de Movimentações Aeroportuárias")
+icon_base64 = get_image_as_base64(ICON_PATH)
+if icon_base64:
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+            <img src="data:image/gif;base64,{icon_base64}" style="max-width: 100px; margin-right: 20px;">
+            <h1 style="margin: 0px;color: #595a5c;white-space: nowrap;">Chatbot de Movimentações Aeroportuárias</h1>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.title("✈️ Chatbot de Movimentações Aeroportuárias")
+
+
 st.markdown(
     f"""
     ---
@@ -124,17 +152,17 @@ if 'shuffled_questions' not in st.session_state:
     a1, a2, a3, a4, a5, a6, a7 = random_airports
 
     preset_questions = [
-        f"Qual o volume de passageiros que chegaram em {a1} em janeiro de {ultimo_ano}?",
-        f"Total de carga transportada em {a2} em {ultimo_ano}?",
-        "Qual a evolução da movimentação de passageiros no Brasil?",
-        f"Quais empresas operam em {a6}?",
-        f"Faça um gráfico com a movimentação de passageiros no aeroporto de {a7}.",
-        f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
-        f"Qual o operador que mais transportou cargas em {a3} em {ultimo_ano}?",
-        f"Qual foi o principal destino para o aeroporto de {a4} em {ultimo_ano}?",
-        "Qual o destino mais acessado no Brasil?",
-        f"Qual a empresa com maiores atrasos em {a5} em {ultimo_ano}?",
-        f"Qual o operador com maiores atrasos no Brasil em {ultimo_ano}?"
+        f"Quantos passageiros desembarcaram em {a1} no mês de janeiro de {ultimo_ano}?",
+        f"Qual foi o total de carga movimentada em {a2} durante o ano de {ultimo_ano}?",
+        "Como tem evoluído a movimentação de passageiros no Brasil ao longo do tempo?",
+        f"Que companhias aéreas operam atualmente em {a6}?",
+        f"Mostre um gráfico da movimentação de passageiros no aeroporto de {a7}.",
+        f"Qual companhia aérea liderou o transporte de passageiros em {ultimo_ano}?",
+        f"Qual operador foi responsável pelo maior volume de cargas transportadas em {a3} em {ultimo_ano}?",
+        f"Para qual destino mais voaram os passageiros partindo de {a4} em {ultimo_ano}?",
+        "Qual é o destino nacional mais visitado?",
+        f"Qual empresa teve o maior número de atrasos em {a5} durante {ultimo_ano}?",
+        f"Qual operador registrou mais atrasos no Brasil em {ultimo_ano}?"
     ]
     random.shuffle(preset_questions)
     st.session_state.shuffled_questions = preset_questions
@@ -153,7 +181,7 @@ for i, q in enumerate(questions_to_show[:questions_limit]):
         st.rerun()
 
 if not st.session_state.show_all_questions and len(questions_to_show) > 3:
-    if st.button("➕ Ver mais perguntas", key="show_more", use_container_width=True):
+    if st.button("➕", key="show_more", use_container_width=True):
         st.session_state.show_all_questions = True
         st.rerun()
 
