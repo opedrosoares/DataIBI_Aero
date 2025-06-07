@@ -4,6 +4,7 @@ import json
 import duckdb
 import io
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 from datetime import datetime, timedelta
@@ -346,12 +347,22 @@ def calcular_market_share(pasta_parquet, ano=None, mes=None, aeroporto=None):
     finally:
         con.close()
 
-def gerar_grafico_market_share(share_data):
+def gerar_grafico_market_share(share_data, logo_path=None):
     try:
         labels = [operador_icao_para_nome.get(item['NR_AERONAVE_OPERADOR'], item['NR_AERONAVE_OPERADOR']) for item in share_data]
         sizes = [item['PaxShare'] for item in share_data]
         colors = plt.cm.Paired(range(len(labels)))
         fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Adiciona a marca d'água PRIMEIRO
+        if logo_path and os.path.exists(logo_path):
+            logo_img = plt.imread(logo_path)
+            fig_width, fig_height = fig.get_size_inches() * fig.dpi
+            logo_width, logo_height = logo_img.shape[1], logo_img.shape[0]
+            x_pos = (fig_width - logo_width) / 2
+            y_pos = (fig_height - logo_height) / 2
+            fig.figimage(logo_img, xo=x_pos, yo=y_pos, alpha=0.5, zorder=0)
+
         wedges, texts, autotexts = ax.pie(
             sizes, 
             labels=None,
@@ -370,28 +381,84 @@ def gerar_grafico_market_share(share_data):
                   bbox_to_anchor=(1, 0, 0.5, 1))
         plt.setp(autotexts, size=8, weight="bold", color="white")
         ax.set_title("Participação de Mercado por Passageiros", pad=20)
+        
+        # Define o fundo do eixo como transparente para ver a marca d'água
+        ax.patch.set_alpha(0.0)
+
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight')
+        plt.savefig(buf, format='png', bbox_inches='tight', transparent=True)
         buf.seek(0)
         return buf
     except Exception as e:
         print(f"Erro ao gerar gráfico de market share: {e}")
         return None
 
-def transcrever_audio(audio_data):
-    if not client:
-        print("Cliente OpenAI não configurado. Transcrição de áudio abortada.")
+def obter_historico_movimentacao(pasta_parquet, tipo_consulta="passageiros", aeroporto=None):
+    if not os.path.exists(pasta_parquet): return None
+    con = duckdb.connect(database=':memory:', read_only=False)
+    arquivos_parquet = [os.path.join(pasta_parquet, f) for f in os.listdir(pasta_parquet) if f.endswith('.parquet')]
+    if not arquivos_parquet:
+        con.close()
         return None
+    condicoes = []
+    if aeroporto:
+        condicoes.append(f"NR_AEROPORTO_REFERENCIA = '{aeroporto.upper()}'")
+    where_clause = "WHERE " + " AND ".join(condicoes) if condicoes else ""
+    if tipo_consulta == "passageiros":
+        select_clause = "SUM(QT_PAX_LOCAL + QT_PAX_CONEXAO_DOMESTICO + QT_PAX_CONEXAO_INTERNACIONAL) AS TotalValor"
+    else:
+        select_clause = "SUM(QT_CARGA) AS TotalValor"
+    query = f"""
+    SELECT ANO, {select_clause}
+    FROM read_parquet({arquivos_parquet})
+    {where_clause}
+    GROUP BY ANO
+    ORDER BY ANO
+    """
     try:
-        audio_file = io.BytesIO(audio_data)
-        audio_file.name = "audio.wav"
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file
-        )
-        return transcript.text
+        resultado = con.execute(query).fetchdf()
+        return resultado if not resultado.empty else None
     except Exception as e:
-        print(f"Erro ao transcrever áudio: {e}")
+        print(f"DEBUG: Erro ao obter histórico de movimentação: {e}")
+        return None
+    finally:
+        con.close()
+
+def gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=None):
+    try:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Adiciona a marca d'água PRIMEIRO
+        if logo_path and os.path.exists(logo_path):
+            logo_img = plt.imread(logo_path)
+            fig_width, fig_height = fig.get_size_inches() * fig.dpi
+            logo_width, logo_height = logo_img.shape[1], logo_img.shape[0]
+            x_pos = (fig_width - logo_width) / 2
+            y_pos = (fig_height - logo_height) / 2
+            fig.figimage(logo_img, xo=x_pos, yo=y_pos, alpha=0.5, zorder=0)
+            
+        ax.plot(df_historico['ANO'], df_historico['TotalValor'], marker='o', linestyle='-', color='b')
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax.set_title(f'Evolução Anual de {tipo_consulta.capitalize()} - {local.title()}', fontsize=16, pad=20)
+        ax.set_xlabel('Ano', fontsize=12)
+        ylabel = f'Total de {tipo_consulta.capitalize()}'
+        if tipo_consulta == 'cargas':
+            ylabel += ' (kg)'
+        ax.set_ylabel(ylabel, fontsize=12)
+        formatter = mticker.FuncFormatter(lambda x, p: format(int(x), ','))
+        ax.yaxis.set_major_formatter(formatter)
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+        
+        # Define o fundo do eixo como transparente
+        ax.patch.set_alpha(0.0)
+        
+        plt.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', transparent=True)
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"Erro ao gerar gráfico de histórico: {e}")
         return None
 
 # --- Função de Parsing da Pergunta do Usuário com LLM ---
@@ -417,28 +484,33 @@ def parse_pergunta_com_llm(pergunta_usuario):
         - "intencao_principal_destino": (booleano: `true` para "principal destino", "destino mais acessado", "local de destino", `false` caso contrário)
         - "intencao_maiores_atrasos": (booleano: `true` se a pergunta for sobre "maiores atrasos", "piores atrasos", "empresa mais atrasada", `false` caso contrário)
         - "intencao_market_share": (booleano: `true` se a pergunta for sobre "market share", "participação de mercado", "quais empresas operam", `false` caso contrário)
+        - "intencao_historico_movimentacao": (booleano: `true` se a pergunta for sobre "histórico", "evolução", "gráfico da movimentação ao longo do tempo", `false` caso contrário)
 
         Prioridade de intenções: Se uma intenção de ranking for `true`, outros parâmetros podem ser `null`, a menos que o ano ou um aeroporto específico seja mencionado.
 
         Exemplos de saída JSON:
+        - Pergunta: "Qual a evolução da quantidade de passageiros no Brasil?"
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": true}}
+        - Pergunta: "gráfico do histórico de cargas em Guarulhos"
+          Saída: {{"aeroporto": "Guarulhos", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": true, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": true}}
         - Pergunta: "Qual o destino mais acessado no Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual o destino mais acessado no Brasil em 2022?"
-          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": null, "ano": 2022, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual foi o principal destino para o aeroporto de Brasília em 2024?"
-          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": "Brasília", "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": true, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual o número de passageiros no aeroporto de Recife em 2023?"
-          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": "Recife", "ano": 2023, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual aeroporto mais movimentado do Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": true, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual a empresa que mais transportou passageiros em 2024?"
-          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": true, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": null, "ano": 2024, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": true, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual o operador que mais transportou cargas em Brasília no último ano?"
-          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": true, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false}}
+          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": true, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": true, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Qual a empresa com maiores atrasos em Brasília?"
-          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": true, "intencao_market_share": false}}
+          Saída: {{"aeroporto": "Brasília", "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": true, "intencao_market_share": false, "intencao_historico_movimentacao": false}}
         - Pergunta: "Quais empresas operam no Brasil?"
-          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": true}}
+          Saída: {{"aeroporto": null, "ano": null, "mes": null, "tipo_movimento": null, "natureza": null, "intencao_carga": false, "intencao_mais_movimentado": false, "intencao_mais_voos_internacionais": false, "intencao_maior_operador_pax": false, "intencao_maior_operador_carga": false, "intencao_principal_destino": false, "intencao_maiores_atrasos": false, "intencao_market_share": true, "intencao_historico_movimentacao": false}}
         """},
         {"role": "user", "content": pergunta_usuario}
     ]
@@ -470,7 +542,7 @@ def parse_pergunta_com_llm(pergunta_usuario):
                       "intencao_mais_movimentado", "intencao_mais_voos_internacionais",
                       "intencao_maior_operador_pax", "intencao_maior_operador_carga",
                       "intencao_principal_destino", "intencao_maiores_atrasos",
-                      "intencao_market_share"}
+                      "intencao_market_share", "intencao_historico_movimentacao"}
                       
         for key in valid_keys:
              if key.startswith("intencao_") and (key not in params or not isinstance(params[key], bool)):

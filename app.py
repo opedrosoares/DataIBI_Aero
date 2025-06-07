@@ -6,7 +6,7 @@ import random
 import streamlit.components.v1 as components
 
 # Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Importa as funções de lógica do chatbot
 from chatbot_logic import (
@@ -25,7 +25,9 @@ from chatbot_logic import (
     obter_operador_maiores_atrasos,
     calcular_market_share,
     obter_top_10_aeroportos,
-    gerar_grafico_market_share
+    gerar_grafico_market_share,
+    obter_historico_movimentacao,
+    gerar_grafico_historico
 )
 
 # Importa as funções de banco de dados
@@ -62,15 +64,27 @@ if ultimo_ano is None:
     st.stop()
 
 # --- Logo e CSS Personalizado ---
-LOGO_PATH = "images/logo.svg"
+# CORRIGIDO: Constrói o caminho absoluto para a logo
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
+
 st.markdown(
     """
     <style>
+    /* Design principal da página */
+    .stApp {
+        padding-bottom: 8rem; /* Adiciona espaço no final da página para a barra de chat */
+    }
     div[data-testid="stFullScreenFrame"] > div:first-child { margin: 0 auto; display: table; width: 100%; max-width: 700px; }
     .stImage { width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 1rem; margin-bottom: 1rem; }
     .stImage img { width: 100%; max-width: 500px; height: auto; display: block; }
     .stButton > button { text-align: left; justify-content: flex-start; width: 100%; }
-    div[data-testid="stForm"] { margin-left: auto; margin-right: auto; max-width: 700px; }
+    
+    /* Esconde o rodapé padrão do Streamlit */
+    .stApp > footer {
+        display: none;
+    }
+    
     </style>
     """,
     unsafe_allow_html=True
@@ -96,21 +110,22 @@ if 'shuffled_questions' not in st.session_state:
     top_10_icao = obter_top_10_aeroportos(PASTA_ARQUIVOS_PARQUET, ano=ultimo_ano)
     icao_para_nome_map = {v: k for k, v in aeroporto_nome_para_icao.items()}
     available_airports = [icao_para_nome_map.get(icao, icao).title() for icao in top_10_icao]
-    num_airports_needed = 6
+    num_airports_needed = 7
     if len(available_airports) >= num_airports_needed:
         random_airports = random.sample(available_airports, num_airports_needed)
     elif available_airports:
         random_airports = random.choices(available_airports, k=num_airports_needed)
     else:
-        random_airports = ["Brasília", "Guarulhos", "Congonhas", "Galeão", "Salvador", "Recife"]
+        random_airports = ["Brasília", "Guarulhos", "Congonhas", "Galeão", "Salvador", "Recife", "Fortaleza"]
 
-    a1, a2, a3, a4, a5, a6 = random_airports
+    a1, a2, a3, a4, a5, a6, a7 = random_airports
 
     preset_questions = [
         f"Qual o volume de passageiros que chegaram em {a1} em janeiro de {ultimo_ano}?",
         f"Total de carga transportada em {a2} em {ultimo_ano}?",
-        "Qual o aeroporto mais movimentado do Brasil?",
+        "Qual a evolução da movimentação de passageiros no Brasil?",
         f"Quais empresas operam em {a6}?",
+        f"Faça um gráfico com a movimentação de passageiros no aeroporto de {a7}.",
         f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
         f"Qual o operador que mais transportou cargas em {a3} em {ultimo_ano}?",
         f"Qual foi o principal destino para o aeroporto de {a4} em {ultimo_ano}?",
@@ -147,28 +162,21 @@ for message in st.session_state.messages:
             text_content, image_content = message["content"]
             st.markdown(text_content)
             if image_content:
-                st.image(image_content, use_container_width=True) # CORRIGIDO
+                st.image(image_content, use_container_width=True)
         else:
             st.markdown(message["content"])
 
-# --- Lógica principal do Chat ---
-current_prompt = None
-if prompt_from_input := st.chat_input("Pergunte-me sobre movimentações aeroportuárias..."): current_prompt = prompt_from_input
-elif st.session_state.process_preset_prompt:
-    current_prompt = st.session_state.preset_prompt
-    st.session_state.process_preset_prompt = False
-    st.session_state.preset_prompt = ""
-
-if current_prompt:
-    st.session_state.messages.append({"role": "user", "content": current_prompt})
+# --- Lógica de Processamento Centralizada ---
+def process_input(prompt):
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
-        st.markdown(current_prompt)
+        st.markdown(prompt)
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             resposta_chatbot_texto = ""
             resposta_chatbot_imagem = None
-            parametros = parse_pergunta_com_llm(current_prompt)
+            parametros = parse_pergunta_com_llm(prompt)
             
             feedback_usuario = []
             intencoes = [k for k, v in parametros.items() if k.startswith('intencao_') and v]
@@ -178,7 +186,23 @@ if current_prompt:
             if feedback_usuario:
                 resposta_chatbot_texto = f"Desculpe. {' '.join(feedback_usuario)} Por favor, tente novamente de forma mais clara."
             else:
-                if parametros.get('intencao_market_share'):
+                if parametros.get('intencao_historico_movimentacao'):
+                    tipo_consulta = "cargas" if parametros.get('intencao_carga') else "passageiros"
+                    local = "Brasil"
+                    aeroporto_filtro = parametros.get('aeroporto')
+                    if aeroporto_filtro:
+                        local = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro)
+                    df_historico = obter_historico_movimentacao(
+                        PASTA_ARQUIVOS_PARQUET,
+                        tipo_consulta=tipo_consulta,
+                        aeroporto=aeroporto_filtro
+                    )
+                    if df_historico is not None:
+                        resposta_chatbot_texto = f"Aqui está o gráfico da evolução de {tipo_consulta} para **{local}**:"
+                        resposta_chatbot_imagem = gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=LOGO_PATH)
+                    else:
+                        resposta_chatbot_texto = f"Não encontrei dados para gerar o histórico de {tipo_consulta} para **{local}**."
+                elif parametros.get('intencao_market_share'):
                     resultado_share = calcular_market_share(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), mes=parametros.get('mes'), aeroporto=parametros.get('aeroporto'))
                     if resultado_share and resultado_share['data']:
                         local_str = "no Brasil"
@@ -196,28 +220,19 @@ if current_prompt:
                             nome_operador = operador_icao_para_nome.get(op['NR_AERONAVE_OPERADOR'], op['NR_AERONAVE_OPERADOR'])
                             lista_operadores.append(f"- **{nome_operador}**: {op['VooShare']:.1f}% dos voos e {op['PaxShare']:.1f}% dos passageiros.")
                         resposta_chatbot_texto += "\n".join(lista_operadores)
-                        resposta_chatbot_imagem = gerar_grafico_market_share(resultado_share['data'])
-                    else:
-                        resposta_chatbot_texto = "Não encontrei dados para calcular a participação de mercado com os critérios fornecidos."
-
+                        resposta_chatbot_imagem = gerar_grafico_market_share(resultado_share['data'], logo_path=LOGO_PATH)
                 elif parametros.get('intencao_mais_movimentado'):
                     resultado_ranking = obter_aeroporto_mais_movimentado(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'))
                     if resultado_ranking:
                         aeroporto_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
                         total_passageiros_formatado = formatar_numero_br(resultado_ranking['total_passageiros'])
                         resposta_chatbot_texto = f"No ano de {resultado_ranking['ano']}, o aeroporto mais movimentado do Brasil foi **{aeroporto_nome}**, com um total de **{total_passageiros_formatado}** passageiros."
-                    else:
-                        resposta_chatbot_texto = f"Não encontrei dados sobre o aeroporto mais movimentado."
-                
                 elif parametros.get('intencao_mais_voos_internacionais'):
                     resultado_ranking = obter_aeroporto_mais_voos_internacionais(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'))
                     if resultado_ranking:
                         aeroporto_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
                         total_voos_formatado = formatar_numero_br(resultado_ranking['total_voos'])
                         resposta_chatbot_texto = f"No ano de {resultado_ranking['ano']}, o aeroporto com mais voos internacionais foi **{aeroporto_nome}**, com **{total_voos_formatado}** voos."
-                    else:
-                        resposta_chatbot_texto = "Não foi possível determinar o aeroporto com mais voos internacionais."
-
                 elif parametros.get('intencao_maior_operador_pax'):
                     resultado_operador = obter_operador_mais_passageiros(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_operador:
@@ -228,9 +243,6 @@ if current_prompt:
                             nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_operador['aeroporto'].upper()), resultado_operador['aeroporto'])
                             local_str = f"no aeroporto de {nome_aeroporto} em {resultado_operador['ano']}"
                         resposta_chatbot_texto = f"A empresa que mais transportou passageiros {local_str} foi a **{nome_operador}**, com um total de **{total_pax_formatado}** passageiros."
-                    else:
-                        resposta_chatbot_texto = "Não foi possível determinar a empresa que mais transportou passageiros para os critérios especificados."
-
                 elif parametros.get('intencao_maior_operador_carga'):
                     resultado_operador = obter_operador_mais_cargas(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_operador:
@@ -241,9 +253,6 @@ if current_prompt:
                             nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_operador['aeroporto'].upper()), resultado_operador['aeroporto'])
                             local_str = f"no aeroporto de {nome_aeroporto} em {resultado_operador['ano']}"
                         resposta_chatbot_texto = f"A empresa que mais transportou cargas {local_str} foi a **{nome_operador}**, com um total de **{total_cargas_formatado}** kg de cargas."
-                    else:
-                        resposta_chatbot_texto = "Não foi possível determinar a empresa que mais transportou cargas para os critérios especificados."
-
                 elif parametros.get('intencao_principal_destino'):
                     resultado_destino = obter_principal_destino(PASTA_ARQUIVOS_PARQUET, aeroporto_origem=parametros.get('aeroporto'), ano=parametros.get('ano'))
                     if resultado_destino and resultado_destino.get('destino_icao'):
@@ -254,9 +263,6 @@ if current_prompt:
                             nome_aeroporto_origem = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['aeroporto_origem'].upper()), resultado_destino['aeroporto_origem'])
                             local_str = f"para o aeroporto de **{nome_aeroporto_origem}** em {resultado_destino['ano']}"
                         resposta_chatbot_texto = f"O principal destino {local_str}, foi **{destino_nome}**, com um total de **{total_voos_formatado}** voos."
-                    else:
-                        resposta_chatbot_texto = "Não foi possível determinar o principal destino para os critérios especificados."
-
                 elif parametros.get('intencao_maiores_atrasos'):
                     resultado_atrasos = obter_operador_maiores_atrasos(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_atrasos:
@@ -269,9 +275,6 @@ if current_prompt:
                             nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_atrasos['aeroporto'].upper()), resultado_atrasos['aeroporto'])
                             local_str = f"no aeroporto de **{nome_aeroporto}** em {resultado_atrasos['ano']}"
                         resposta_chatbot_texto = f"A empresa com maiores atrasos {local_str} foi a **{nome_operador}**, com um total de **{horas} horas e {minutos} minutos** de atraso."
-                    else:
-                        resposta_chatbot_texto = "Não foi possível determinar a empresa com maiores atrasos para os critérios especificados."
-                
                 else: 
                     tipo_consulta_db = "passageiros"
                     if parametros.get('intencao_carga'): tipo_consulta_db = "carga"
@@ -322,12 +325,11 @@ if current_prompt:
 
             st.markdown(resposta_chatbot_texto)
             if resposta_chatbot_imagem:
-                st.image(resposta_chatbot_imagem, use_container_width=True) # CORRIGIDO
+                st.image(resposta_chatbot_imagem, use_container_width=True)
 
-            if current_prompt:
-                content_to_save = (resposta_chatbot_texto, resposta_chatbot_imagem) if resposta_chatbot_imagem else resposta_chatbot_texto
-                st.session_state.messages.append({"role": "assistant", "content": content_to_save})
-                save_conversation(current_prompt, resposta_chatbot_texto)
+            content_to_save = (resposta_chatbot_texto, resposta_chatbot_imagem) if resposta_chatbot_imagem else resposta_chatbot_texto
+            st.session_state.messages.append({"role": "assistant", "content": content_to_save})
+            save_conversation(prompt, resposta_chatbot_texto)
 
             components.html(
                 """<script>
@@ -338,3 +340,19 @@ if current_prompt:
                 </script>""",
                 height=0
             )
+
+# --- Processamento do Input ---
+prompt = st.chat_input("Pergunte-me sobre movimentações aeroportuárias...")
+
+final_prompt = None
+
+if prompt:
+    final_prompt = prompt
+elif st.session_state.get('process_preset_prompt'):
+    final_prompt = st.session_state.get('preset_prompt')
+    st.session_state.process_preset_prompt = False
+
+if final_prompt:
+    process_input(final_prompt)
+    st.rerun()
+
