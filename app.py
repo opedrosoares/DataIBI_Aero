@@ -2,6 +2,8 @@ import streamlit as st
 import os
 import sys
 import pandas as pd
+import random
+import streamlit.components.v1 as components
 
 # Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
 sys.path.append(os.path.dirname(__file__))
@@ -20,10 +22,13 @@ from chatbot_logic import (
     aeroporto_nome_para_icao,
     mes_numero_para_nome,
     operador_icao_para_nome,
-    obter_operador_maiores_atrasos
+    obter_operador_maiores_atrasos,
+    calcular_market_share,
+    obter_top_10_aeroportos,
+    gerar_grafico_market_share
 )
 
-# --- NOVO: Importa as funções de banco de dados ---
+# Importa as funções de banco de dados
 from database_logic import init_db, save_conversation, get_all_conversations_as_df
 
 # --- Configuração da página Streamlit ---
@@ -31,11 +36,21 @@ st.set_page_config(
     page_title="Chatbot de Movimentações Aeroportuárias - IBI",
     page_icon="images/favicon.png",
     layout="centered",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
 
-# --- NOVO: Inicializa o banco de dados ao iniciar o app ---
+# Inicializa o banco de dados ao iniciar o app
 init_db()
+
+# --- Barra Lateral com Histórico de Conversas ---
+with st.sidebar:
+    st.title("🗒️ Histórico de Conversas")
+    
+    history_df = get_all_conversations_as_df()
+    if not history_df.empty:
+        st.dataframe(history_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("O histórico de conversas está vazio.")
 
 # Caminho para a pasta de arquivos Parquet
 PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
@@ -46,41 +61,16 @@ if ultimo_ano is None:
     st.error("Não foi possível determinar o último ano disponível nos dados. Verifique a pasta de arquivos Parquet.")
     st.stop()
 
-# --- Logo e CSS Personalizado (sem alterações) ---
+# --- Logo e CSS Personalizado ---
 LOGO_PATH = "images/logo.svg"
 st.markdown(
     """
     <style>
-    div[data-testid="stFullScreenFrame"] > div:first-child {
-        margin: 0 auto;
-        display: table;
-        width: 100%;
-        max-width: 700px;
-    }
-    .stImage {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-    }
-    .stImage img {
-        width: 100%;
-        max-width: 500px;
-        height: auto;
-        display: block;
-    }
-    .stButton > button {
-        text-align: left;
-        justify-content: flex-start;
-        width: 100%;
-    }
-    div[data-testid="stForm"] {
-        margin-left: auto;
-        margin-right: auto;
-        max-width: 700px;
-    }
+    div[data-testid="stFullScreenFrame"] > div:first-child { margin: 0 auto; display: table; width: 100%; max-width: 700px; }
+    .stImage { width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 1rem; margin-bottom: 1rem; }
+    .stImage img { width: 100%; max-width: 500px; height: auto; display: block; }
+    .stButton > button { text-align: left; justify-content: flex-start; width: 100%; }
+    div[data-testid="stForm"] { margin-left: auto; margin-right: auto; max-width: 700px; }
     </style>
     """,
     unsafe_allow_html=True
@@ -97,55 +87,73 @@ st.markdown(
     ---
     ##### Olá! Sou seu assistente virtual do *Observatório de Dados* do Instituto Brasileiro de Infraestrutura.
     Fui treinado com dados das movimentações aeroportuárias de **2019 à {ultimo_ano}**.
-
     Posso responder a perguntas como:
     """
 )
 
 # --- Perguntas de Exemplo ---
-preset_questions = [
-    f"Qual o volume de passageiros que chegaram em Recife em janeiro de {ultimo_ano}?",
-    f"Total de carga transportada em Guarulhos em {ultimo_ano}?",
-    "Qual o aeroporto mais movimentado do Brasil?",
-    "Qual aeroporto com mais voos internacionais?",
-    f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
-    f"Qual o operador que mais transportou cargas em Brasília em {ultimo_ano}?",
-    f"Qual foi o principal destino para o aeroporto de Brasília em {ultimo_ano}?",
-    "Qual o destino mais acessado no Brasil?",
-    f"Qual a empresa com maiores atrasos em Brasília em {ultimo_ano}?",
-    f"Qual o operador com maiores atrasos no Brasil em {ultimo_ano}?"
-]
+if 'shuffled_questions' not in st.session_state:
+    top_10_icao = obter_top_10_aeroportos(PASTA_ARQUIVOS_PARQUET, ano=ultimo_ano)
+    icao_para_nome_map = {v: k for k, v in aeroporto_nome_para_icao.items()}
+    available_airports = [icao_para_nome_map.get(icao, icao).title() for icao in top_10_icao]
+    num_airports_needed = 6
+    if len(available_airports) >= num_airports_needed:
+        random_airports = random.sample(available_airports, num_airports_needed)
+    elif available_airports:
+        random_airports = random.choices(available_airports, k=num_airports_needed)
+    else:
+        random_airports = ["Brasília", "Guarulhos", "Congonhas", "Galeão", "Salvador", "Recife"]
 
-if 'preset_prompt' not in st.session_state:
-    st.session_state.preset_prompt = ""
-if 'process_preset_prompt' not in st.session_state:
-    st.session_state.process_preset_prompt = False
+    a1, a2, a3, a4, a5, a6 = random_airports
 
-for i, q in enumerate(preset_questions):
+    preset_questions = [
+        f"Qual o volume de passageiros que chegaram em {a1} em janeiro de {ultimo_ano}?",
+        f"Total de carga transportada em {a2} em {ultimo_ano}?",
+        "Qual o aeroporto mais movimentado do Brasil?",
+        f"Quais empresas operam em {a6}?",
+        f"Qual a empresa que mais transportou passageiros em {ultimo_ano}?",
+        f"Qual o operador que mais transportou cargas em {a3} em {ultimo_ano}?",
+        f"Qual foi o principal destino para o aeroporto de {a4} em {ultimo_ano}?",
+        "Qual o destino mais acessado no Brasil?",
+        f"Qual a empresa com maiores atrasos em {a5} em {ultimo_ano}?",
+        f"Qual o operador com maiores atrasos no Brasil em {ultimo_ano}?"
+    ]
+    random.shuffle(preset_questions)
+    st.session_state.shuffled_questions = preset_questions
+
+if 'preset_prompt' not in st.session_state: st.session_state.preset_prompt = ""
+if 'process_preset_prompt' not in st.session_state: st.session_state.process_preset_prompt = False
+if 'show_all_questions' not in st.session_state: st.session_state.show_all_questions = False
+
+questions_to_show = st.session_state.shuffled_questions
+questions_limit = len(questions_to_show) if st.session_state.show_all_questions else 3
+
+for i, q in enumerate(questions_to_show[:questions_limit]):
     if st.button(q, key=f"q_button_{i}", use_container_width=True):
         st.session_state.preset_prompt = q
         st.session_state.process_preset_prompt = True
         st.rerun()
 
-# --- Verificação dos arquivos Parquet ---
-if not os.path.exists(PASTA_ARQUIVOS_PARQUET) or not os.listdir(PASTA_ARQUIVOS_PARQUET):
-    st.error("Atenção: A pasta 'dados_aeroportuarios_parquet' não foi encontrada ou está vazia.")
-    st.info("Por favor, execute o script `conversor_json_parquet.py` para gerar os arquivos Parquet e coloque-os na pasta.")
-    st.stop()
+if not st.session_state.show_all_questions and len(questions_to_show) > 3:
+    if st.button("➕ Ver mais perguntas", key="show_more", use_container_width=True):
+        st.session_state.show_all_questions = True
+        st.rerun()
 
-# --- Interface do Chat (Histórico da Sessão Atual) ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
+# --- Interface do Chat ---
+if "messages" not in st.session_state: st.session_state.messages = []
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if isinstance(message["content"], tuple):
+            text_content, image_content = message["content"]
+            st.markdown(text_content)
+            if image_content:
+                st.image(image_content, use_container_width=True) # CORRIGIDO
+        else:
+            st.markdown(message["content"])
 
 # --- Lógica principal do Chat ---
 current_prompt = None
-
-if prompt_from_input := st.chat_input("Pergunte-me sobre movimentações aeroportuárias..."):
-    current_prompt = prompt_from_input
+if prompt_from_input := st.chat_input("Pergunte-me sobre movimentações aeroportuárias..."): current_prompt = prompt_from_input
 elif st.session_state.process_preset_prompt:
     current_prompt = st.session_state.preset_prompt
     st.session_state.process_preset_prompt = False
@@ -158,248 +166,175 @@ if current_prompt:
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            # A lógica para gerar a resposta permanece a mesma
-            resposta_chatbot = ""
+            resposta_chatbot_texto = ""
+            resposta_chatbot_imagem = None
             parametros = parse_pergunta_com_llm(current_prompt)
             
-            # [TODA A LÓGICA DE PROCESSAMENTO DA PERGUNTA E GERAÇÃO DA RESPOSTA VEM AQUI]
-            # [COLE AQUI A LÓGICA ORIGINAL DO SEU 'app.py' QUE FICA DENTRO DO 'with st.spinner("Pensando..."):' ]
-            # ...
-            # Para manter o exemplo conciso, vamos simular que a resposta foi gerada.
-            # No seu código final, você deve manter toda a sua lógica de `if/elif/else` para definir a `resposta_chatbot`.
-            
-            # --- Início da Lógica de Geração de Resposta (COPIADA DO SEU ARQUIVO ORIGINAL) ---
             feedback_usuario = []
-            if not parametros or not (
-                any(parametros.get(k) for k in ["aeroporto", "ano", "mes", "tipo_movimento", "natureza", "intencao_carga"]) or
-                parametros.get('intencao_mais_movimentado') or
-                parametros.get('intencao_mais_voos_internacionais') or
-                parametros.get('intencao_maior_operador_pax') or
-                parametros.get('intencao_maior_operador_carga') or
-                parametros.get('intencao_principal_destino') or
-                parametros.get('intencao_maiores_atrasos')
-            ):
+            intencoes = [k for k, v in parametros.items() if k.startswith('intencao_') and v]
+            if not parametros or (not any(parametros.get(k) for k in ["aeroporto", "ano", "mes"]) and not intencoes):
                 feedback_usuario.append("Não consegui extrair informações relevantes da sua pergunta.")
-            else:
-                for key in ["intencao_carga", "intencao_mais_movimentado", "intencao_mais_voos_internacionais",
-                            "intencao_maior_operador_pax", "intencao_maior_operador_carga", "intencao_principal_destino", "intencao_maiores_atrasos"]:
-                    if key not in parametros or not isinstance(parametros[key], bool):
-                        parametros[key] = False
-
-                if not (parametros['intencao_mais_movimentado'] or parametros['intencao_mais_voos_internacionais'] or
-                        parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or
-                        parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
-                    if not parametros.get('aeroporto'):
-                        feedback_usuario.append("Não identifiquei o aeroporto. Poderia especificar o nome ou código ICAO?")
-                    if not parametros.get('ano'):
-                        if not (parametros.get('aeroporto') and parametros.get('mes')):
-                            feedback_usuario.append("Não identifiquei o ano. Poderia especificar o ano da movimentação?")
-                
-                if (parametros['intencao_maior_operador_pax'] or parametros['intencao_maior_operador_carga'] or parametros['intencao_principal_destino'] or parametros['intencao_maiores_atrasos']):
-                    if parametros.get('aeroporto') and (parametros.get('aeroporto').upper() not in aeroporto_nome_para_icao.values()):
-                        if not (parametros['aeroporto'].lower() == "brasil" or parametros['aeroporto'] == "null"):
-                            feedback_usuario.append(f"O aeroporto '{parametros['aeroporto']}' não é reconhecido. Poderia usar um código ICAO ou nome mais comum?")
-
+            
             if feedback_usuario:
-                resposta_chatbot = f"Desculpe. {' '.join(feedback_usuario)} Por favor, tente novamente de forma mais clara."
+                resposta_chatbot_texto = f"Desculpe. {' '.join(feedback_usuario)} Por favor, tente novamente de forma mais clara."
             else:
-                if 'mes' in parametros and parametros['mes'] is not None:
-                    try:
-                        parametros['mes'] = int(parametros['mes'])
-                    except (ValueError, TypeError):
-                        parametros['mes'] = None
-                
-                if parametros['intencao_mais_movimentado']:
-                    ano_referencia = parametros.get('ano')
-                    resultado_ranking = obter_aeroporto_mais_movimentado(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia)
+                if parametros.get('intencao_market_share'):
+                    resultado_share = calcular_market_share(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), mes=parametros.get('mes'), aeroporto=parametros.get('aeroporto'))
+                    if resultado_share and resultado_share['data']:
+                        local_str = "no Brasil"
+                        if resultado_share['aeroporto']:
+                            nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_share['aeroporto'].upper()), resultado_share['aeroporto'])
+                            local_str = f"no Aeroporto de {nome_aeroporto}"
+                        ano_resp = resultado_share.get('ano', ultimo_ano)
+                        periodo_str = f"para o ano de {ano_resp}"
+                        if resultado_share['mes']:
+                            periodo_str += f" e mês de {mes_numero_para_nome.get(resultado_share['mes'], '')}"
+                        
+                        resposta_chatbot_texto = f"**Aqui está a participação de mercado {local_str} ({periodo_str.replace('para o ', '')})**\n\n"
+                        lista_operadores = []
+                        for op in resultado_share['data']:
+                            nome_operador = operador_icao_para_nome.get(op['NR_AERONAVE_OPERADOR'], op['NR_AERONAVE_OPERADOR'])
+                            lista_operadores.append(f"- **{nome_operador}**: {op['VooShare']:.1f}% dos voos e {op['PaxShare']:.1f}% dos passageiros.")
+                        resposta_chatbot_texto += "\n".join(lista_operadores)
+                        resposta_chatbot_imagem = gerar_grafico_market_share(resultado_share['data'])
+                    else:
+                        resposta_chatbot_texto = "Não encontrei dados para calcular a participação de mercado com os critérios fornecidos."
+
+                elif parametros.get('intencao_mais_movimentado'):
+                    resultado_ranking = obter_aeroporto_mais_movimentado(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'))
                     if resultado_ranking:
-                        aeroporto_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
+                        aeroporto_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
                         total_passageiros_formatado = formatar_numero_br(resultado_ranking['total_passageiros'])
-                        resposta_chatbot = f"No ano de {resultado_ranking['ano']}, o aeroporto mais movimentado do Brasil foi **{aeroporto_nome.title()}**, com um total de **{total_passageiros_formatado}** passageiros."
+                        resposta_chatbot_texto = f"No ano de {resultado_ranking['ano']}, o aeroporto mais movimentado do Brasil foi **{aeroporto_nome}**, com um total de **{total_passageiros_formatado}** passageiros."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar o aeroporto mais movimentado. Verifique os dados para o ano {ano_referencia if ano_referencia else 'disponível'}."
+                        resposta_chatbot_texto = f"Não encontrei dados sobre o aeroporto mais movimentado."
                 
-                elif parametros['intencao_mais_voos_internacionais']:
-                    ano_referencia = parametros.get('ano')
-                    resultado_ranking = obter_aeroporto_mais_voos_internacionais(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia)
+                elif parametros.get('intencao_mais_voos_internacionais'):
+                    resultado_ranking = obter_aeroporto_mais_voos_internacionais(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'))
                     if resultado_ranking:
-                        aeroporto_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
+                        aeroporto_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_ranking['aeroporto'].upper()), resultado_ranking['aeroporto'].upper())
                         total_voos_formatado = formatar_numero_br(resultado_ranking['total_voos'])
-                        resposta_chatbot = f"No ano de {resultado_ranking['ano']}, o aeroporto com mais voos internacionais foi **{aeroporto_nome.title()}**, com **{total_voos_formatado}** voos internacionais registrados."
+                        resposta_chatbot_texto = f"No ano de {resultado_ranking['ano']}, o aeroporto com mais voos internacionais foi **{aeroporto_nome}**, com **{total_voos_formatado}** voos."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar o aeroporto com mais voos internacionais. Verifique os dados para o ano {ano_referencia if ano_referencia else 'disponível'}."
+                        resposta_chatbot_texto = "Não foi possível determinar o aeroporto com mais voos internacionais."
 
-                elif parametros['intencao_maior_operador_pax']:
-                    ano_referencia = parametros.get('ano')
-                    aeroporto_filtro = parametros.get('aeroporto')
-                    resultado_operador = obter_operador_mais_passageiros(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
+                elif parametros.get('intencao_maior_operador_pax'):
+                    resultado_operador = obter_operador_mais_passageiros(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_operador:
-                        ano_str = f" em {resultado_operador['ano']}" if resultado_operador['ano'] else ""
-                        aeroporto_str = ""
-                        if aeroporto_filtro:
-                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
-                            aeroporto_str = f" no aeroporto de {nome_aeroporto_exibicao.title()}"
-                        
+                        nome_operador = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
                         total_pax_formatado = formatar_numero_br(resultado_operador['total_passageiros'])
-                        nome_operador_completo = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
-                        
-                        resposta_chatbot = f"A empresa que mais transportou passageiros{aeroporto_str}{ano_str} foi a **{nome_operador_completo}**, com um total de **{total_pax_formatado}** passageiros."
+                        local_str = f"no Brasil em {resultado_operador['ano']}"
+                        if resultado_operador.get('aeroporto'):
+                            nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_operador['aeroporto'].upper()), resultado_operador['aeroporto'])
+                            local_str = f"no aeroporto de {nome_aeroporto} em {resultado_operador['ano']}"
+                        resposta_chatbot_texto = f"A empresa que mais transportou passageiros {local_str} foi a **{nome_operador}**, com um total de **{total_pax_formatado}** passageiros."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar a empresa que mais transportou passageiros para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+                        resposta_chatbot_texto = "Não foi possível determinar a empresa que mais transportou passageiros para os critérios especificados."
 
-                elif parametros['intencao_maior_operador_carga']:
-                    ano_referencia = parametros.get('ano')
-                    aeroporto_filtro = parametros.get('aeroporto')
-                    resultado_operador = obter_operador_mais_cargas(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
+                elif parametros.get('intencao_maior_operador_carga'):
+                    resultado_operador = obter_operador_mais_cargas(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_operador:
-                        ano_str = f" em {resultado_operador['ano']}" if resultado_operador['ano'] else ""
-                        aeroporto_str = ""
-                        if aeroporto_filtro:
-                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
-                            aeroporto_str = f" no aeroporto de {nome_aeroporto_exibicao.title()}"
-
+                        nome_operador = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
                         total_cargas_formatado = formatar_numero_br(resultado_operador['total_cargas'])
-                        nome_operador_completo = operador_icao_para_nome.get(resultado_operador['operador'].upper(), resultado_operador['operador'].upper())
-
-                        resposta_chatbot = f"A empresa que mais transportou cargas{aeroporto_str}{ano_str} foi a **{nome_operador_completo}**, com um total de **{total_cargas_formatado}** kg de cargas."
+                        local_str = f"no Brasil em {resultado_operador['ano']}"
+                        if resultado_operador.get('aeroporto'):
+                            nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_operador['aeroporto'].upper()), resultado_operador['aeroporto'])
+                            local_str = f"no aeroporto de {nome_aeroporto} em {resultado_operador['ano']}"
+                        resposta_chatbot_texto = f"A empresa que mais transportou cargas {local_str} foi a **{nome_operador}**, com um total de **{total_cargas_formatado}** kg de cargas."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar a empresa que mais transportou cargas para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+                        resposta_chatbot_texto = "Não foi possível determinar a empresa que mais transportou cargas para os critérios especificados."
 
-                elif parametros['intencao_principal_destino']:
-                    ano_referencia = parametros.get('ano')
-                    aeroporto_origem_filtro = parametros.get('aeroporto')
-                    
-                    resultado_destino = obter_principal_destino(PASTA_ARQUIVOS_PARQUET, aeroporto_origem=aeroporto_origem_filtro, ano=ano_referencia)
-                    
-                    if resultado_destino and resultado_destino['destino_icao'] is not None:
-                        destino_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['destino_icao'].upper()), resultado_destino['destino_icao'].upper())
+                elif parametros.get('intencao_principal_destino'):
+                    resultado_destino = obter_principal_destino(PASTA_ARQUIVOS_PARQUET, aeroporto_origem=parametros.get('aeroporto'), ano=parametros.get('ano'))
+                    if resultado_destino and resultado_destino.get('destino_icao'):
+                        destino_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['destino_icao'].upper()), resultado_destino['destino_icao'].upper())
                         total_voos_formatado = formatar_numero_br(resultado_destino['total_voos'])
-                        frase_aeroporto_origem = ""
-                        if aeroporto_origem_filtro:
-                            nome_aeroporto_origem_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_origem_filtro.upper()), aeroporto_origem_filtro.upper())
-                            frase_aeroporto_origem = f" para o aeroporto de **{nome_aeroporto_origem_exibicao.title()}**"
-
-                        resposta_chatbot = f"No ano de {resultado_destino['ano']}{frase_aeroporto_origem}, o principal destino foi **{destino_nome.title()}**, com um total de **{total_voos_formatado}** voos."
+                        local_str = f"no Brasil em {resultado_destino['ano']}"
+                        if resultado_destino.get('aeroporto_origem'):
+                            nome_aeroporto_origem = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_destino['aeroporto_origem'].upper()), resultado_destino['aeroporto_origem'])
+                            local_str = f"para o aeroporto de **{nome_aeroporto_origem}** em {resultado_destino['ano']}"
+                        resposta_chatbot_texto = f"O principal destino {local_str}, foi **{destino_nome}**, com um total de **{total_voos_formatado}** voos."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar o principal destino para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_origem_filtro if aeroporto_origem_filtro else 'todos'})."
+                        resposta_chatbot_texto = "Não foi possível determinar o principal destino para os critérios especificados."
 
-                elif parametros['intencao_maiores_atrasos']:
-                    ano_referencia = parametros.get('ano')
-                    aeroporto_filtro = parametros.get('aeroporto')
-                    resultado_atrasos = obter_operador_maiores_atrasos(PASTA_ARQUIVOS_PARQUET, ano=ano_referencia, aeroporto=aeroporto_filtro)
-                    
+                elif parametros.get('intencao_maiores_atrasos'):
+                    resultado_atrasos = obter_operador_maiores_atrasos(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'), aeroporto=parametros.get('aeroporto'))
                     if resultado_atrasos:
-                        nome_operador_completo = operador_icao_para_nome.get(resultado_atrasos['operador'].upper(), resultado_atrasos['operador'].upper())
+                        nome_operador = operador_icao_para_nome.get(resultado_atrasos['operador'].upper(), resultado_atrasos['operador'].upper())
                         total_minutos_atraso = resultado_atrasos['total_minutos_atraso']
                         horas = int(total_minutos_atraso // 60)
                         minutos = int(total_minutos_atraso % 60)
-                        ano_str = f" em {resultado_atrasos['ano']}" if resultado_atrasos['ano'] else ""
-                        aeroporto_str_exibicao = ""
-                        if aeroporto_filtro:
-                            nome_aeroporto_exibicao = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == aeroporto_filtro.upper()), aeroporto_filtro.upper())
-                            aeroporto_str_exibicao = f" no aeroporto de **{nome_aeroporto_exibicao.title()}**"
-
-                        resposta_chatbot = f"A empresa com maiores atrasos{aeroporto_str_exibicao}{ano_str} foi a **{nome_operador_completo}**, com um total de **{horas} horas e {minutos} minutos** de atraso em pousos."
+                        local_str = f"no Brasil em {resultado_atrasos['ano']}"
+                        if resultado_atrasos.get('aeroporto'):
+                            nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == resultado_atrasos['aeroporto'].upper()), resultado_atrasos['aeroporto'])
+                            local_str = f"no aeroporto de **{nome_aeroporto}** em {resultado_atrasos['ano']}"
+                        resposta_chatbot_texto = f"A empresa com maiores atrasos {local_str} foi a **{nome_operador}**, com um total de **{horas} horas e {minutos} minutos** de atraso."
                     else:
-                        resposta_chatbot = f"Não foi possível determinar a empresa com maiores atrasos para os critérios especificados (Ano: {ano_referencia if ano_referencia else 'último disponível'}, Aeroporto: {aeroporto_filtro if aeroporto_filtro else 'todos'})."
+                        resposta_chatbot_texto = "Não foi possível determinar a empresa com maiores atrasos para os critérios especificados."
                 
                 else: 
                     tipo_consulta_db = "passageiros"
-                    if parametros.get('intencao_carga'):
-                        tipo_consulta_db = "carga"
-
+                    if parametros.get('intencao_carga'): tipo_consulta_db = "carga"
+                    
                     resultados_df = consultar_movimentacoes_aeroportuarias(
-                        PASTA_ARQUIVOS_PARQUET,
-                        aeroporto=parametros.get('aeroporto'),
-                        ano=parametros.get('ano'),
-                        mes=parametros.get('mes'),
-                        tipo_movimento=parametros.get('tipo_movimento'),
-                        natureza=parametros.get('natureza'),
-                        tipo_consulta=tipo_consulta_db
+                        PASTA_ARQUIVOS_PARQUET, aeroporto=parametros.get('aeroporto'), ano=parametros.get('ano'), mes=parametros.get('mes'),
+                        tipo_movimento=parametros.get('tipo_movimento'), natureza=parametros.get('natureza'), tipo_consulta=tipo_consulta_db
                     )
+                    
+                    total_valor = resultados_df['TotalValor'].iloc[0] if resultados_df is not None and not resultados_df.empty else None
 
-                    if resultados_df is not None and not resultados_df.empty:
-                        total_valor = resultados_df['TotalValor'].iloc[0]
-                        resposta_semantica = f"No "
+                    if total_valor is not None and pd.notna(total_valor):
+                        resposta_semantica = "No "
                         if parametros.get('mes'):
-                            nome_do_mes = mes_numero_para_nome.get(parametros['mes'], str(parametros['mes']))
-                            resposta_semantica += f"mês de {nome_do_mes.capitalize()} de "
-
+                            resposta_semantica += f"mês de {mes_numero_para_nome.get(parametros['mes'], '')} de "
                         if parametros.get('ano'):
-                            resposta_semantica += f"{parametros['ano']}"
-                            if parametros.get('aeroporto') or parametros.get('mes'):
-                                resposta_semantica += ", "
-                            else:
-                                resposta_semantica += " "
-
+                            resposta_semantica += f"{parametros['ano']}, "
                         if parametros.get('aeroporto'):
-                            aeroporto_nome = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == parametros['aeroporto'].upper()), parametros['aeroporto'].upper())
+                            aeroporto_nome = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == parametros['aeroporto'].upper()), parametros['aeroporto'])
                             if not parametros.get('mes') and not parametros.get('ano'):
-                                resposta_semantica = f"O aeroporto de {aeroporto_nome.title()} "
+                                resposta_semantica = f"O aeroporto de {aeroporto_nome} "
                             else:
-                                resposta_semantica += f"o aeroporto de {aeroporto_nome.title()} "
-
+                                resposta_semantica += f"o aeroporto de {aeroporto_nome} "
+                        
                         valor_formatado = formatar_numero_br(total_valor)
 
                         if tipo_consulta_db == "passageiros":
                             verbo = "recebeu" if parametros.get('tipo_movimento') == 'P' else ("registrou" if parametros.get('tipo_movimento') == 'D' else "movimentou")
                             resposta_semantica += f"{verbo} um total de **{valor_formatado}** passageiros"
-                        else: # Carga
+                        else:
                             resposta_semantica += f"movimentou um total de **{valor_formatado}** kg de cargas"
-
+                        
                         if parametros.get('tipo_movimento'):
-                            mov_tipo = "pousos" if parametros['tipo_movimento'] == 'P' else "decolagens"
-                            resposta_semantica += f" em {mov_tipo}"
-
+                            resposta_semantica += f" em {'pousos' if parametros['tipo_movimento'] == 'P' else 'decolagens'}"
                         if parametros.get('natureza'):
-                            natureza_tipo = "domésticos" if parametros['natureza'] == 'D' else "internacionais"
-                            resposta_semantica += f" em voos {natureza_tipo}"
-
-                        resposta_semantica += "."
-                        resposta_chatbot = resposta_semantica.replace(", ,", ", ").replace("  ", " ").strip().replace(" .", ".")
-
+                            resposta_semantica += f" em voos {'domésticos' if parametros['natureza'] == 'D' else 'internacionais'}"
+                        
+                        resposta_chatbot_texto = resposta_semantica.replace(" ,", ",").replace("  ", " ").strip() + "."
                     else:
                         criterios = []
                         if parametros.get('aeroporto'):
-                            aeroporto_nome_feedback = next((nome for nome, icao in aeroporto_nome_para_icao.items() if icao == parametros['aeroporto'].upper()), parametros['aeroporto'].upper())
-                            criterios.append(f"aeroporto: {aeroporto_nome_feedback.title()}")
-                        if parametros.get('ano'):
-                                criterios.append(f"ano: {parametros['ano']}")
-                        if parametros.get('mes'):
-                            nome_do_mes_feedback = mes_numero_para_nome.get(parametros['mes'], str(parametros['mes']))
-                            criterios.append(f"mês: {nome_do_mes_feedback.capitalize()}")
-                        if parametros.get('tipo_movimento'):
-                            mov_tipo_feedback = "Pouso" if parametros['tipo_movimento'] == 'P' else "Decolagem"
-                            criterios.append(f"tipo de movimento: {mov_tipo_feedback}")
-                        if parametros.get('natureza'):
-                            natureza_tipo_feedback = "Doméstico" if parametros['natureza'] == 'D' else "Internacional"
-                            criterios.append(f"natureza: {natureza_tipo_feedback}")
+                            nome_aeroporto = next((nome.title() for nome, icao in aeroporto_nome_para_icao.items() if icao == parametros['aeroporto'].upper()), parametros['aeroporto'])
+                            criterios.append(f"aeroporto: {nome_aeroporto}")
+                        if parametros.get('ano'): criterios.append(f"ano: {parametros['ano']}")
+                        if parametros.get('mes'): criterios.append(f"mês: {mes_numero_para_nome.get(parametros['mes'], '')}")
                         
-                        tipo_valor_feedback = "passageiros" if tipo_consulta_db == "passageiros" else "cargas"
-                        criterios.append(f"para {tipo_valor_feedback}")
+                        resposta_chatbot_texto = f"Não foram encontrados dados com os critérios especificados: {', '.join(criterios)}." if criterios else "Não encontrei dados para sua solicitação."
 
-                        if criterios:
-                            resposta_chatbot = f"Não foram encontrados dados com os critérios especificados. Para os critérios {', '.join(criterios)}: Verifique se os dados existem para esta combinação ou tente critérios de pesquisa mais amplos."
-                        else:
-                            resposta_chatbot = "Não foram encontrados dados com os critérios especificados. Por favor, tente uma pergunta diferente ou especifique mais detalhes."
-            # --- Fim da Lógica de Geração de Resposta ---
+            st.markdown(resposta_chatbot_texto)
+            if resposta_chatbot_imagem:
+                st.image(resposta_chatbot_imagem, use_container_width=True) # CORRIGIDO
 
-            # Exibe a resposta do chatbot na interface
-            st.markdown(resposta_chatbot)
-            
-            # --- NOVO: Salva a conversa no banco de dados ---
-            if current_prompt and resposta_chatbot:
-                save_conversation(current_prompt, resposta_chatbot)
-            
-            # Adiciona a resposta ao histórico da sessão atual
-            st.session_state.messages.append({"role": "assistant", "content": resposta_chatbot})
+            if current_prompt:
+                content_to_save = (resposta_chatbot_texto, resposta_chatbot_imagem) if resposta_chatbot_imagem else resposta_chatbot_texto
+                st.session_state.messages.append({"role": "assistant", "content": content_to_save})
+                save_conversation(current_prompt, resposta_chatbot_texto)
 
-# --- NOVO: Seção para exibir o histórico de conversas do banco de dados ---
-st.markdown("---")
-with st.expander("Ver Histórico de Conversas Salvas"):
-    history_df = get_all_conversations_as_df()
-    if not history_df.empty:
-        # Usamos st.dataframe para uma visualização em tabela interativa
-        st.dataframe(history_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("O histórico de conversas está vazio.")
+            components.html(
+                """<script>
+                    setTimeout(function(){
+                        var stMain = window.parent.document.getElementsByClassName("stMain")[0];
+                        if (stMain) { stMain.scrollTo({ top: stMain.scrollHeight, behavior: 'smooth' }); }
+                    }, 200);
+                </script>""",
+                height=0
+            )

@@ -3,3 +3,4 @@ duckdb
 openai
 tenacity
 streamlit
+matplotlib
