@@ -5,6 +5,8 @@ import sys
 # Adiciona o diretório atual ao sys.path para que chatbot_logic.py possa ser importado
 sys.path.append(os.path.dirname(__file__))
 
+from database_utils import init_db, save_conversation
+
 # Importa todas as funções e variáveis necessárias do chatbot_logic.py
 from chatbot_logic import (
     parse_pergunta_com_llm,
@@ -29,6 +31,9 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="auto"
 )
+
+# Initialize the database
+init_db()
 
 # Caminho para a pasta de arquivos Parquet
 PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
@@ -409,4 +414,10 @@ if current_prompt:
 
             # Exibe a resposta do chatbot na interface
             st.markdown(resposta_chatbot)
+
+            # Append to session state messages
             st.session_state.messages.append({"role": "assistant", "content": resposta_chatbot})
+
+            # Save the conversation to the database
+            if current_prompt and resposta_chatbot: # Ensure both exist before saving
+                save_conversation(current_prompt, resposta_chatbot)
