@@ -3,7 +3,7 @@ import os
 import sys
 import pandas as pd
 import random
-import streamlit.components.v1 as components
+# O import de st.components.v1 foi removido, pois não é mais necessário
 
 # Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -176,10 +176,9 @@ def process_input(prompt):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        resposta_chatbot_texto = ""
-        resposta_chatbot_imagem = None
-        
         with st.spinner("Pensando..."):
+            resposta_chatbot_texto = ""
+            resposta_chatbot_imagem = None
             parametros = parse_pergunta_com_llm(prompt)
             
             feedback_usuario = []
@@ -202,7 +201,6 @@ def process_input(prompt):
                         aeroporto=aeroporto_filtro
                     )
                     if df_historico is not None:
-                        # Adiciona os dados textuais para a reescrita do LLM
                         dados_texto = []
                         for _, row in df_historico.iterrows():
                             dados_texto.append(f"- Ano {row['ANO']}: {formatar_numero_br(row['TotalValor'])}")
@@ -353,14 +351,15 @@ def process_input(prompt):
             st.session_state.messages.append({"role": "assistant", "content": content_to_save})
             save_conversation(prompt, resposta_chatbot_texto)
 
-        components.html(
-            """<script>
-                setTimeout(function(){
-                    var stMain = window.parent.document.getElementsByClassName("stMain")[0];
-                    if (stMain) { stMain.scrollTo({ top: stMain.scrollHeight, behavior: 'smooth' }); }
+        st.markdown(
+            """
+            <script>
+                setTimeout(function() {
+                    window.top.document.querySelector('div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div:last-child').scrollIntoView({ behavior: 'smooth' });
                 }, 200);
-            </script>""",
-            height=0
+            </script>
+            """,
+            unsafe_allow_html=True
         )
 
 # --- Processamento do Input ---
@@ -377,4 +376,3 @@ elif st.session_state.get('process_preset_prompt'):
 if final_prompt:
     process_input(final_prompt)
     st.rerun()
-
