@@ -461,6 +461,47 @@ def gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=None):
         print(f"Erro ao gerar gráfico de histórico: {e}")
         return None
 
+# --- NOVA FUNÇÃO ---
+def reescrever_resposta_com_llm(pergunta, resposta_factual):
+    """
+    Usa o LLM para reescrever a resposta factual de forma mais fluida e elaborada.
+    """
+    if not client:
+        print("Cliente OpenAI não configurado. Reescrita da resposta abortada.")
+        return resposta_factual
+
+    prompt_messages = [
+        {
+            "role": "system",
+            "content": "Você é um assistente de comunicação especializado em aviação e dados. Sua tarefa é reescrever respostas técnicas e factuais, tornando-as mais naturais, fluídas e informativas para um usuário geral, sem perder a precisão dos dados. Adicione um breve contexto ou um fato interessante sobre o tema quando apropriado. Caso seja apresentado dados ao longo dos anos, analise sua coorelação e infira o comportamento observado."
+        },
+        {
+            "role": "user",
+            "content": f"""Reescreva a resposta abaixo, ampliando-a suscintamente.
+
+**Pergunta Original:**
+"{pergunta}"
+
+**Resposta Factual a ser Reescrevida:**
+"{resposta_factual}"
+"""
+        }
+    ]
+
+    try:
+        completion = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=prompt_messages,
+            max_tokens=500,
+            temperature=0.7
+        )
+        
+        rewritten_text = completion.choices[0].message.content
+        return rewritten_text.strip()
+    except Exception as e:
+        print(f"DEBUG: Erro ao reescrever resposta com o LLM: {e}")
+        return resposta_factual
+
 # --- Função de Parsing da Pergunta do Usuário com LLM ---
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=retry_if_result(lambda result: not result))
 def parse_pergunta_com_llm(pergunta_usuario):

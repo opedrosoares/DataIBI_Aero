@@ -27,7 +27,8 @@ from chatbot_logic import (
     obter_top_10_aeroportos,
     gerar_grafico_market_share,
     obter_historico_movimentacao,
-    gerar_grafico_historico
+    gerar_grafico_historico,
+    reescrever_resposta_com_llm
 )
 
 # Importa as funções de banco de dados
@@ -64,7 +65,6 @@ if ultimo_ano is None:
     st.stop()
 
 # --- Logo e CSS Personalizado ---
-# CORRIGIDO: Constrói o caminho absoluto para a logo
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
 
@@ -90,7 +90,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH)
+    if LOGO_PATH.endswith('.svg'):
+        st.image(LOGO_PATH)
+    else:
+        st.image(LOGO_PATH)
 else:
     st.warning(f"Logo não encontrada em: {LOGO_PATH}")
 
@@ -173,9 +176,10 @@ def process_input(prompt):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
+        resposta_chatbot_texto = ""
+        resposta_chatbot_imagem = None
+        
         with st.spinner("Pensando..."):
-            resposta_chatbot_texto = ""
-            resposta_chatbot_imagem = None
             parametros = parse_pergunta_com_llm(prompt)
             
             feedback_usuario = []
@@ -198,7 +202,11 @@ def process_input(prompt):
                         aeroporto=aeroporto_filtro
                     )
                     if df_historico is not None:
-                        resposta_chatbot_texto = f"Aqui está o gráfico da evolução de {tipo_consulta} para **{local}**:"
+                        # Adiciona os dados textuais para a reescrita do LLM
+                        dados_texto = []
+                        for _, row in df_historico.iterrows():
+                            dados_texto.append(f"- Ano {row['ANO']}: {formatar_numero_br(row['TotalValor'])}")
+                        resposta_chatbot_texto = f"Dados da evolução de {tipo_consulta} para **{local}**:\n" + "\n".join(dados_texto)
                         resposta_chatbot_imagem = gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=LOGO_PATH)
                     else:
                         resposta_chatbot_texto = f"Não encontrei dados para gerar o histórico de {tipo_consulta} para **{local}**."
@@ -322,24 +330,38 @@ def process_input(prompt):
                         if parametros.get('mes'): criterios.append(f"mês: {mes_numero_para_nome.get(parametros['mes'], '')}")
                         
                         resposta_chatbot_texto = f"Não foram encontrados dados com os critérios especificados: {', '.join(criterios)}." if criterios else "Não encontrei dados para sua solicitação."
-
+        
+        # Reescreve a resposta se não for um erro
+        is_error_or_feedback = (
+            "Não consegui extrair" in resposta_chatbot_texto or
+            "Não encontrei dados" in resposta_chatbot_texto or
+            "Não foi possível determinar" in resposta_chatbot_texto
+        )
+        if not is_error_or_feedback and resposta_chatbot_texto:
+            with st.spinner("Elaborando resposta..."):
+                resposta_final = reescrever_resposta_com_llm(prompt, resposta_chatbot_texto)
+                st.markdown(resposta_final)
+                if resposta_chatbot_imagem:
+                    st.image(resposta_chatbot_imagem, use_container_width=True)
+                
+                content_to_save = (resposta_final, resposta_chatbot_imagem) if resposta_chatbot_imagem else resposta_final
+                st.session_state.messages.append({"role": "assistant", "content": content_to_save})
+                save_conversation(prompt, resposta_final)
+        else:
             st.markdown(resposta_chatbot_texto)
-            if resposta_chatbot_imagem:
-                st.image(resposta_chatbot_imagem, use_container_width=True)
-
-            content_to_save = (resposta_chatbot_texto, resposta_chatbot_imagem) if resposta_chatbot_imagem else resposta_chatbot_texto
+            content_to_save = (resposta_chatbot_texto, None)
             st.session_state.messages.append({"role": "assistant", "content": content_to_save})
             save_conversation(prompt, resposta_chatbot_texto)
 
-            components.html(
-                """<script>
-                    setTimeout(function(){
-                        var stMain = window.parent.document.getElementsByClassName("stMain")[0];
-                        if (stMain) { stMain.scrollTo({ top: stMain.scrollHeight, behavior: 'smooth' }); }
-                    }, 200);
-                </script>""",
-                height=0
-            )
+        components.html(
+            """<script>
+                setTimeout(function(){
+                    var stMain = window.parent.document.getElementsByClassName("stMain")[0];
+                    if (stMain) { stMain.scrollTo({ top: stMain.scrollHeight, behavior: 'smooth' }); }
+                }, 200);
+            </script>""",
+            height=0
+        )
 
 # --- Processamento do Input ---
 prompt = st.chat_input("Pergunte-me sobre movimentações aeroportuárias...")
