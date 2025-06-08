@@ -44,15 +44,15 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     
     # Gerar insights baseado no tipo selecionado
     if analysis_type == "Análise Geral":
-        render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+        render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
     elif analysis_type == "Análise de Mercado":
-        render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+        render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
     elif analysis_type == "Análise Sazonal":
-        render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+        render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
     elif analysis_type == "Análise Comparativa":
-        render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+        render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 
-def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
+def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("🎯 Insights Principais")
     
     # Métricas principais
@@ -124,7 +124,7 @@ def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
                 else:
                     st.error("Não foi possível gerar insights no momento.")
 
-def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
+def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("📈 Análise de Mercado")
     
     # Market share geral
@@ -159,7 +159,7 @@ def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
                     else:
                         st.info("Análise de mercado não disponível no momento.")
 
-def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
+def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("🗓️ Análise Sazonal")
     
     # Aqui você implementaria análise sazonal
@@ -213,7 +213,7 @@ def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
         
         st.plotly_chart(fig, use_container_width=True)
 
-def render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
+def render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("⚖️ Análise Comparativa")
     
     # Comparação ano a ano
