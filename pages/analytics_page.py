@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import os
+import base64
 
 from analytics.advanced_ai import (
     generate_correlation_analysis,
@@ -66,7 +67,7 @@ def render_correlation_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("📊 Análise de Correlação")
     
     # Simular matriz de correlação
-    if st.button("🔍 Executar Análise de Correlação", type="primary"):
+    if st.button("Executar Análise de Correlação", type="primary"):
         with st.spinner("Analisando correlações entre variáveis..."):
             # Dados simulados para demonstração
             variables = ['Passageiros', 'Cargas', 'Voos Domésticos', 'Voos Internacionais', 
@@ -118,7 +119,7 @@ def render_correlation_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
 def render_cluster_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("🎯 Segmentação de Aeroportos")
     
-    if st.button("🔬 Executar Análise de Clusters", type="primary"):
+    if st.button("Executar Análise de Clusters", type="primary"):
         with st.spinner("Segmentando aeroportos por características..."):
             # Simulação de dados de aeroportos
             aeroportos = ['GRU', 'CGH', 'BSB', 'GIG', 'SSA', 'REC', 'FOR', 'POA', 'CWB', 'BEL']
@@ -228,7 +229,7 @@ def render_kpi_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.markdown("---")
     
     # Gráfico de KPIs ao longo do tempo
-    if st.button("📊 Visualizar Tendências dos KPIs", type="primary"):
+    if st.button("Visualizar Tendências dos KPIs", type="primary"):
         meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 
                 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
         
@@ -281,7 +282,7 @@ def render_demand_forecasting(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     with col2:
         confidence = st.slider("Nível de Confiança", 80, 99, 95, help="Intervalo de confiança da previsão")
     
-    if st.button("🚀 Gerar Previsão de Demanda", type="primary"):
+    if st.button("Gerar Previsão de Demanda", type="primary"):
         with st.spinner("Modelando demanda futura com IA..."):
             # Simulação de previsão
             months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun']
@@ -346,7 +347,7 @@ def render_demand_forecasting(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
 def render_ai_recommendations(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.subheader("💡 Recomendações Inteligentes")
     
-    if st.button("🧠 Gerar Recomendações com IA", type="primary"):
+    if st.button("Gerar Recomendações com IA", type="primary"):
         with st.spinner("Analisando dados e gerando recomendações..."):
             st.success("✅ Análise concluída! Recomendações geradas.")
             

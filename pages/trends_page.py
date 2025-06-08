@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import os
+import base64
 from datetime import datetime, timedelta
 
 from analytics.trends_ai import predict_future_trends, analyze_growth_patterns, detect_anomalies
@@ -170,7 +171,7 @@ def render_predictions(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type, predicti
     )
     
     if df_historico is not None and not df_historico.empty:
-        if st.button("🚀 Gerar Previsões", type="primary", key="generate_predictions"):
+        if st.button("Gerar Previsões", type="primary", key="generate_predictions"):
             with st.spinner("Gerando previsões com IA..."):
                 predictions = predict_future_trends(df_historico, metric_type, prediction_months)
                 
@@ -270,7 +271,7 @@ def render_anomaly_detection(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
     )
     
     if df_historico is not None and not df_historico.empty:
-        if st.button("🔍 Detectar Anomalias", type="primary", key="detect_anomalies"):
+        if st.button("Detectar Anomalias", type="primary", key="detect_anomalies"):
             with st.spinner("Analisando dados em busca de anomalias..."):
                 anomalies = detect_anomalies(df_historico, metric_type)
                 
@@ -345,7 +346,7 @@ def render_anomaly_detection(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
 def render_ai_report(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
     st.subheader("📋 Relatório Inteligente")
     
-    if st.button("📄 Gerar Relatório IA", type="primary", key="generate_ai_report"):
+    if st.button("Gerar Relatório IA", type="primary", key="generate_ai_report"):
         with st.spinner("Gerando relatório abrangente com IA..."):
             # Simular relatório de IA
             st.success("✅ Relatório gerado com sucesso!")

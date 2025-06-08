@@ -71,7 +71,10 @@ if ultimo_ano is None:
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(APP_DIR, "images", "logo.svg")
 LOGO_WATERMARK_PATH = os.path.join(APP_DIR, "images", "logo.png")
-ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
+CHAT_ICON_PATH = os.path.join(APP_DIR, "images", "chat_page.gif")
+INSIGHTS_ICON_PATH = os.path.join(APP_DIR, "images", "insights_page.gif")
+ANALYTICS_ICON_PATH = os.path.join(APP_DIR, "images", "analytics_page.gif")
+TRENDS_ICON_PATH = os.path.join(APP_DIR, "images", "trends_page.gif")
 
 st.markdown(
     """
@@ -118,20 +121,21 @@ st.markdown(
     }
 
     /* Title styling */
-    h1 {
+    h1, h2, h3 {
         color: #595a5c !important;
     }
 
     /* Primary button styling */
     .stButton > button[data-testid="baseButton-primary"] {
-        background-color: #007bff !important;
-        border-color: #007bff !important;
+        background-color: #017fff !important;
+        border-color: #017fff !important;
         color: white !important;
+        justify-content: center;
     }
 
     .stButton > button[data-testid="baseButton-primary"]:hover {
-        background-color: #0056b3 !important;
-        border-color: #0056b3 !important;
+        background-color: #017fff !important;
+        border-color: #017fff !important;
     }
 
     /* Hide streamlit default elements */
@@ -175,6 +179,7 @@ st.markdown(
         background-color: #007bff !important;
         border-color: #007bff !important;
         color: white !important;
+        justify-content: center;
     }
     .stButton > button[data-testid="stBaseButton-primary"]:hover {
         background-color: #0056b3 !important;
@@ -244,10 +249,10 @@ if st.session_state.current_page != 'chat':
 
 # --- Renderização da Página Atual ---
 if st.session_state.current_page == 'chat':
-    chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
+    chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, CHAT_ICON_PATH)
 elif st.session_state.current_page == 'insights':
-    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
+    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, INSIGHTS_ICON_PATH)
 elif st.session_state.current_page == 'trends':
-    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
+    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, TRENDS_ICON_PATH)
 elif st.session_state.current_page == 'analytics':
-    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
+    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ANALYTICS_ICON_PATH)

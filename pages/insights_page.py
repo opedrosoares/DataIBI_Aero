@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
+import base64
 
 from analytics.insights_ai import generate_automated_insights, generate_market_insights, generate_seasonal_insights
 from chatbot_logic import (
@@ -56,7 +57,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         )
     
     with col3:
-        if st.button("🔄 Gerar Insights", type="primary"):
+        if st.button("Gerar Insights", type="primary"):
             st.session_state.refresh_insights = True
     
     st.markdown("---")
