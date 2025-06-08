@@ -119,7 +119,7 @@ st.markdown(
 
     /* Title styling */
     h1 {
-        color: #595a5c;
+        color: #595a5c !important;
     }
 
     /* Hide streamlit default elements */
