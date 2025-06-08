@@ -170,6 +170,14 @@ with st.sidebar:
         else:
             st.info("Histórico vazio.")
 
+# --- Display Logo in Main Content Area ---
+if st.session_state.current_page != 'chat':  # Chat page has its own logo display
+    if LOGO_PATH and os.path.exists(LOGO_PATH):
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(LOGO_PATH, width=300)
+        st.markdown("---")
+
 # --- Renderização da Página Atual ---
 if st.session_state.current_page == 'chat':
     chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
