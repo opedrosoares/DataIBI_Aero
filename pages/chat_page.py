@@ -60,7 +60,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             unsafe_allow_html=True,
         )
     else:
-        st.title("<i class='fas fa-plane'></i> Chatbot de Movimentações Aeroportuárias", unsafe_allow_html=True)
+        st.title("✈️ Chatbot de Movimentações Aeroportuárias")
 
     st.markdown(
         f"""
@@ -116,7 +116,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             st.rerun()
 
     if not st.session_state.show_all_questions and len(questions_to_show) > 3:
-        if st.button("<i class='fas fa-plus'></i>", key="show_more", use_container_width=True):
+        if st.button("➕", key="show_more", use_container_width=True):
             st.session_state.show_all_questions = True
             st.rerun()
 
@@ -124,8 +124,8 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
     col1, col2 = st.columns([0.8, 0.2])
     with col2:
         audio_info = mic_recorder(
-            start_prompt="<i class='fas fa-microphone'></i>",
-            stop_prompt="<i class='fas fa-stop'></i>",
+            start_prompt="🎤",
+            stop_prompt="⏹️",
             key='audio_recorder'
         )
 

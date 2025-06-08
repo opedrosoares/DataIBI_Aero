@@ -75,7 +75,6 @@ ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
 st.markdown(
     """
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
     /* Design principal da página */
     .stApp {
@@ -124,13 +123,13 @@ st.markdown(
     }
 
     /* Primary button styling */
-    .stButton > button[data-testid="stBaseButton-primary"] {
+    .stButton > button[data-testid="baseButton-primary"] {
         background-color: #007bff !important;
         border-color: #007bff !important;
         color: white !important;
     }
 
-    .stButton > button[data-testid="stBaseButton-primary"]:hover {
+    .stButton > button[data-testid="baseButton-primary"]:hover {
         background-color: #0056b3 !important;
         border-color: #0056b3 !important;
     }
@@ -198,10 +197,10 @@ with st.sidebar:
 
     # Menu de navegação
     pages = {
-        '<i class="fas fa-robot"></i> Chatbot': "chat",
-        '<i class="fas fa-chart-bar"></i> Insights Automáticos': "insights", 
-        '<i class="fas fa-chart-line"></i> Análise de Tendências': "trends",
-        '<i class="fas fa-bolt"></i> Analytics Avançado': "analytics"
+        "🤖 Chatbot": "chat",
+        "📊 Insights Automáticos": "insights", 
+        "📈 Análise de Tendências": "trends",
+        "⚡ Analytics Avançado": "analytics"
     }
 
     # Inicializa a página atual
@@ -218,7 +217,7 @@ with st.sidebar:
 
     # Histórico de conversas (apenas na página do chat)
     if st.session_state.current_page == 'chat':
-        st.markdown("### <i class='fas fa-clipboard-list'></i> Histórico", unsafe_allow_html=True)
+        st.markdown("### 🗒️ Histórico")
         history_df = get_all_conversations_as_df()
         if not history_df.empty:
             st.dataframe(history_df.tail(5), use_container_width=True, hide_index=True)
