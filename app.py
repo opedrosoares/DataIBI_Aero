@@ -75,6 +75,7 @@ ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
 st.markdown(
     """
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
     /* Design principal da página */
     .stApp {
@@ -197,10 +198,10 @@ with st.sidebar:
 
     # Menu de navegação
     pages = {
-        "🤖 Chatbot": "chat",
-        "📊 Insights Automáticos": "insights", 
-        "📈 Análise de Tendências": "trends",
-        "⚡ Analytics Avançado": "analytics"
+        '<i class="material-icons">smart_toy</i> Chatbot': "chat",
+        '<i class="material-icons">insights</i> Insights Automáticos': "insights", 
+        '<i class="material-icons">trending_up</i> Análise de Tendências': "trends",
+        '<i class="material-icons">analytics</i> Analytics Avançado': "analytics"
     }
 
     # Inicializa a página atual
@@ -212,12 +213,26 @@ with st.sidebar:
         if st.button(page_name, key=f"nav_{page_key}", use_container_width=True):
             st.session_state.current_page = page_key
             st.rerun()
+    
+    # CSS para suportar ícones HTML nos botões
+    st.markdown("""
+    <style>
+    .stButton > button {
+        text-align: left !important;
+    }
+    .material-icons {
+        vertical-align: middle;
+        margin-right: 8px;
+        font-size: 18px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
     # Histórico de conversas (apenas na página do chat)
     if st.session_state.current_page == 'chat':
-        st.markdown("### 🗒️ Histórico")
+        st.markdown('### <i class="material-icons" style="vertical-align: middle;">history</i> Histórico', unsafe_allow_html=True)
         history_df = get_all_conversations_as_df()
         if not history_df.empty:
             st.dataframe(history_df.tail(5), use_container_width=True, hide_index=True)

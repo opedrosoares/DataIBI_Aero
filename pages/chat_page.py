@@ -54,13 +54,13 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             f"""
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                 <img src="data:image/gif;base64,{icon_base64}" style="max-width: 100px; margin-right: 20px;filter: grayscale(0.6);">
-                <h1 style="margin: 0px;color: #595a5c;">Chatbot de Movimentações Aeroportuárias</h1>
+                <h1 style="margin: 0px;color: #595a5c;"><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">flight</i>Chatbot de Movimentações Aeroportuárias</h1>
             </div>
             """,
             unsafe_allow_html=True,
         )
     else:
-        st.title("✈️ Chatbot de Movimentações Aeroportuárias")
+        st.markdown('<h1><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">flight</i>Chatbot de Movimentações Aeroportuárias</h1>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
@@ -116,7 +116,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             st.rerun()
 
     if not st.session_state.show_all_questions and len(questions_to_show) > 3:
-        if st.button("➕", key="show_more", use_container_width=True):
+        if st.button('<i class="material-icons">expand_more</i>', key="show_more", use_container_width=True):
             st.session_state.show_all_questions = True
             st.rerun()
 
