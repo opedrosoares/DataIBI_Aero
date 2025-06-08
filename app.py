@@ -52,7 +52,7 @@ st.set_page_config(
     page_title="Observatório Aeroportuário - IBI",
     page_icon="images/favicon.png",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Inicializa o banco de dados ao iniciar o app
