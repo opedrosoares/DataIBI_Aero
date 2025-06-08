@@ -364,6 +364,7 @@ def gerar_grafico_market_share(share_data, logo_path=None):
             logo_ax.patch.set_alpha(0.0) # Torna o fundo do eixo transparente
             logo_ax.images[0].set_alpha(0.3) # Define a transparência da imagem
 
+
         wedges, texts, autotexts = ax.pie(
             sizes, 
             labels=None,
@@ -436,7 +437,7 @@ def gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=None):
             logo_width, logo_height = logo_img.shape[1], logo_img.shape[0]
             x_pos = (fig_width - logo_width) / 2
             y_pos = (fig_height - logo_height) / 2
-            fig.figimage(logo_img, xo=x_pos, yo=y_pos, alpha=0.3, zorder=0)
+            fig.figimage(logo_img, xo=x_pos, yo=y_pos, alpha=0.5, zorder=0)
             
         ax.plot(df_historico['ANO'], df_historico['TotalValor'], marker='o', linestyle='-', color='b')
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -462,7 +463,22 @@ def gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=None):
         print(f"Erro ao gerar gráfico de histórico: {e}")
         return None
 
-# --- NOVA FUNÇÃO ---
+def transcrever_audio(audio_data):
+    if not client:
+        print("Cliente OpenAI não configurado. Transcrição de áudio abortada.")
+        return None
+    try:
+        audio_file = io.BytesIO(audio_data)
+        audio_file.name = "audio.wav"
+        transcript = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file
+        )
+        return transcript.text
+    except Exception as e:
+        print(f"Erro ao transcrever áudio: {e}")
+        return None
+        
 def reescrever_resposta_com_llm(pergunta, resposta_factual):
     """
     Usa o LLM para reescrever a resposta factual de forma mais fluida e elaborada.
@@ -474,7 +490,7 @@ def reescrever_resposta_com_llm(pergunta, resposta_factual):
     prompt_messages = [
         {
             "role": "system",
-            "content": "Você é um assistente de comunicação especializado em aviação e dados. Sua tarefa é reescrever respostas técnicas e factuais, tornando-as mais naturais, fluídas e informativas para um usuário geral, sem perder a precisão dos dados. Adicione um breve contexto ou um fato interessante sobre o tema quando apropriado. Caso seja apresentado dados ao longo dos anos, analise sua coorelação e infira o comportamento observado."
+            "content": "Você é um assistente de comunicação especializado em aviação e dados. Sua tarefa é reescrever respostas técnicas e factuais, tornando-as mais naturais, fluídas e informativas para um usuário geral, sem perder a precisão dos dados. Adicione um breve contexto ou um fato interessante sobre o tema quando apropriado."
         },
         {
             "role": "user",

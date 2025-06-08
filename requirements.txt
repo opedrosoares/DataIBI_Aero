@@ -4,3 +4,4 @@ openai
 tenacity
 streamlit
 matplotlib
+streamlit-mic-recorder

@@ -5,6 +5,7 @@ import pandas as pd
 import random
 import streamlit.components.v1 as components
 import base64
+from streamlit_mic_recorder import mic_recorder
 
 # Adiciona o diretório atual ao sys.path para que os módulos possam ser importados
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -29,7 +30,8 @@ from chatbot_logic import (
     gerar_grafico_market_share,
     obter_historico_movimentacao,
     gerar_grafico_historico,
-    reescrever_resposta_com_llm
+    reescrever_resposta_com_llm,
+    transcrever_audio
 )
 
 # Importa as funções de banco de dados
@@ -77,6 +79,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
 ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
+
 st.markdown(
     """
     <style>
@@ -94,12 +97,34 @@ st.markdown(
         display: none;
     }
 
-    .stElementContainer.st-key-show_more button {
+    .st-key-audio_recorder {
+        position: fixed;
+        z-index: 999;
+        width: 40px;
+        bottom: 50px;
+        margin-left: 100px;
+    }
+    /* condition for screen size minimum of 736px */
+    @media (max-width:736px) {
+        .st-key-audio_recorder {
+            position: fixed;
+            z-index: 999;
+            right: 10px;
+            width: 40px;
+            bottom: 50px;
+        }
+    }
+
+    /* Classe personalizada para o botão "Ver mais" */
+    .st-key-show_more button {
         width: auto;
         border-radius: 50%;
     }
-    .stElementContainer.st-key-show_more .stButton {
+    .st-key-show_more .stButton {
         text-align: center;
+    }
+    .st-key-chat_input {
+        padding-right: 3em;
     }
     
     </style>
@@ -117,8 +142,8 @@ if icon_base64:
     st.markdown(
         f"""
         <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-            <img src="data:image/gif;base64,{icon_base64}" style="max-width: 100px; margin-right: 20px;">
-            <h1 style="margin: 0px;color: #595a5c;white-space: nowrap;">Chatbot de Movimentações Aeroportuárias</h1>
+            <img src="data:image/gif;base64,{icon_base64}" style="max-width: 100px; margin-right: 20px;filter: grayscale(0.6);">
+            <h1 style="margin: 0px;color: #595a5c;">Chatbot de Movimentações Aeroportuárias</h1>
         </div>
         """,
         unsafe_allow_html=True,
@@ -184,6 +209,15 @@ if not st.session_state.show_all_questions and len(questions_to_show) > 3:
     if st.button("➕", key="show_more", use_container_width=True):
         st.session_state.show_all_questions = True
         st.rerun()
+
+# --- Entrada de áudio ---
+col1, col2 = st.columns([0.8, 0.2])
+with col2:
+    audio_info = mic_recorder(
+        start_prompt="🎤",
+        stop_prompt="⏹️",
+        key='audio_recorder'
+    )
 
 # --- Interface do Chat ---
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -379,24 +413,34 @@ def process_input(prompt):
             st.session_state.messages.append({"role": "assistant", "content": content_to_save})
             save_conversation(prompt, resposta_chatbot_texto)
 
-        st.markdown(
+        components.html(
             """
             <script>
                 setTimeout(function() {
-                    window.top.document.querySelector('div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] > div:last-child').scrollIntoView({ behavior: 'smooth' });
+                    var stMain = window.parent.document.getElementsByClassName("stMain")[0];
+                    if (stMain) { stMain.scrollTo({ top: stMain.scrollHeight, behavior: 'smooth' }); }
                 }, 200);
             </script>
-            """,
-            unsafe_allow_html=True
+            """
         )
 
 # --- Processamento do Input ---
-prompt = st.chat_input("Pergunte-me sobre movimentações aeroportuárias...")
+prompt_from_text = st.chat_input("Pergunte-me sobre movimentações aeroportuárias...", key="chat_input")
 
 final_prompt = None
 
-if prompt:
-    final_prompt = prompt
+if prompt_from_text:
+    final_prompt = prompt_from_text
+elif audio_info and audio_info['bytes']:
+    if 'last_audio_id' not in st.session_state or st.session_state.last_audio_id != audio_info['id']:
+        st.session_state.last_audio_id = audio_info['id']
+        with st.spinner("Transcrevendo..."):
+            audio_bytes = audio_info['bytes']
+            transcribed_text = transcrever_audio(audio_bytes)
+            if transcribed_text:
+                final_prompt = transcribed_text
+            else:
+                st.warning("Não consegui entender o áudio. Por favor, tente novamente.")
 elif st.session_state.get('process_preset_prompt'):
     final_prompt = st.session_state.get('preset_prompt')
     st.session_state.process_preset_prompt = False
