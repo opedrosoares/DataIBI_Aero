@@ -7,3 +7,4 @@ matplotlib
 streamlit-mic-recorder
 pyarrow
 plotly
+plotly

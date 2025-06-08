@@ -11,6 +11,12 @@ from analytics.trends_ai import predict_future_trends, analyze_growth_patterns, 
 from queries.database import obter_historico_movimentacao
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
+    # Display logo at the top
+    if LOGO_PATH and os.path.exists(LOGO_PATH):
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(LOGO_PATH, width=300)
+    
     st.title("📈 Análise de Tendências com IA")
     st.markdown("---")
     
