@@ -59,22 +59,6 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
     else:
         st.title("🛩️ Observatório de Dados Aeroportuário")
 
-    # Estatísticas principais
-    st.markdown(f"""
-    <div class="stats-container">
-        <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
-            <div>
-                <h2>2019-{ultimo_ano}</h2>
-                <p>Período de Análise</p>
-            </div>
-            <div>
-                <h2>70+</h2>
-                <p>Aeroportos Monitorados</p>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     # Cards das páginas usando streamlit-card
     st.markdown("### 🚀 Explore nossas funcionalidades")
 
@@ -222,6 +206,22 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             st.session_state.current_page = 'analytics'
             st.rerun()
 
+    # Estatísticas principais
+    st.markdown(f"""
+    <div class="stats-container">
+        <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+            <div>
+                <h2>2019-{ultimo_ano}</h2>
+                <p>Período de Análise</p>
+            </div>
+            <div>
+                <h2>70+</h2>
+                <p>Aeroportos Monitorados</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Seção de recursos
     st.markdown("---")
     st.markdown("### ✨ Recursos Principais")
