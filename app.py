@@ -170,8 +170,8 @@ with st.sidebar:
         else:
             st.info("Histórico vazio.")
 
-# --- Display Logo in Main Content Area ---
-if st.session_state.current_page != 'chat':  # Chat page has its own logo display
+# --- Display Logo in Main Content Area for non-chat pages ---
+if st.session_state.current_page != 'chat':
     if LOGO_PATH and os.path.exists(LOGO_PATH):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
@@ -182,8 +182,8 @@ if st.session_state.current_page != 'chat':  # Chat page has its own logo displa
 if st.session_state.current_page == 'chat':
     chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
 elif st.session_state.current_page == 'insights':
-    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 elif st.session_state.current_page == 'trends':
-    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 elif st.session_state.current_page == 'analytics':
-    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)

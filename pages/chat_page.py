@@ -38,6 +38,13 @@ def get_image_as_base64(path):
         return base64.b64encode(img_file.read()).decode()
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
+    # Display logo at the top
+    if LOGO_PATH and os.path.exists(LOGO_PATH):
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(LOGO_PATH, width=300)
+        st.markdown("---")
+    
     # Título e Descrição
     icon_base64 = get_image_as_base64(ICON_PATH)
     if icon_base64:

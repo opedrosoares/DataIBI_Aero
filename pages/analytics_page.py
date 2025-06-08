@@ -14,13 +14,7 @@ from analytics.advanced_ai import (
     generate_recommendations
 )
 
-def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH):
-    # Display logo at the top
-    if LOGO_PATH and os.path.exists(LOGO_PATH):
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image(LOGO_PATH, width=300)
-    
+def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     st.title("⚡ Analytics Avançado com IA")
     st.markdown("---")
     
