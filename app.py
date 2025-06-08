@@ -133,42 +133,89 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Barra Lateral com Navegação ---
+# --- Barra Lateral Estilizada ---
 with st.sidebar:
     # Logo na sidebar
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, width=200)
 
-    st.title("🗂️ Navegação")
+    # Inicializa a página atual
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'chat'
 
-    # Menu de navegação
-    pages = {
+    # Navegação estilizada com radio buttons
+    st.markdown("### 🧭 Navegação")
+    
+    page_options = [
+        "🤖 Chatbot",
+        "📊 Insights Automáticos", 
+        "📈 Análise de Tendências",
+        "⚡ Analytics Avançado"
+    ]
+    
+    page_mapping = {
         "🤖 Chatbot": "chat",
         "📊 Insights Automáticos": "insights", 
         "📈 Análise de Tendências": "trends",
         "⚡ Analytics Avançado": "analytics"
     }
-
-    # Inicializa a página atual
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'chat'
-
-    # Botões de navegação
-    for page_name, page_key in pages.items():
-        if st.button(page_name, key=f"nav_{page_key}", use_container_width=True):
-            st.session_state.current_page = page_key
-            st.rerun()
+    
+    # Encontra o índice da página atual
+    current_page_display = None
+    for display_name, page_key in page_mapping.items():
+        if page_key == st.session_state.current_page:
+            current_page_display = display_name
+            break
+    
+    selected_page = st.radio(
+        "",
+        page_options,
+        index=page_options.index(current_page_display) if current_page_display else 0,
+        key="page_selector"
+    )
+    
+    # Atualiza a página se mudou
+    if page_mapping[selected_page] != st.session_state.current_page:
+        st.session_state.current_page = page_mapping[selected_page]
+        st.rerun()
 
     st.markdown("---")
 
-    # Histórico de conversas (apenas na página do chat)
+    # Histórico de conversas estilizado (apenas na página do chat)
     if st.session_state.current_page == 'chat':
-        st.markdown("### 🗒️ Histórico")
+        st.markdown("### 📋 Histórico de Conversas")
+        
         history_df = get_all_conversations_as_df()
         if not history_df.empty:
-            st.dataframe(history_df.tail(5), use_container_width=True, hide_index=True)
+            # Estilização do histórico
+            st.markdown("""
+            <style>
+            .chat-history {
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 8px;
+                margin: 5px 0;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Mostra últimas 5 conversas com estilo
+            recent_conversations = history_df.tail(5)
+            
+            for idx, row in recent_conversations.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div class="chat-history">
+                        <small><strong>🕒 {row['timestamp']}</strong></small><br>
+                        <strong>❓ Pergunta:</strong> {row['question'][:50]}{'...' if len(row['question']) > 50 else ''}<br>
+                        <strong>💬 Resposta:</strong> {row['answer'][:50]}{'...' if len(row['answer']) > 50 else ''}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+            if len(history_df) > 5:
+                st.caption(f"Mostrando 5 de {len(history_df)} conversas")
         else:
-            st.info("Histórico vazio.")
+            st.info("📝 Nenhuma conversa registrada ainda")
 
 # --- Display Logo in Main Content Area ---
 if st.session_state.current_page != 'chat':  # Chat page has its own logo display
