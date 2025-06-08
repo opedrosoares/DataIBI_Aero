@@ -32,15 +32,9 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        cursor: pointer;
         text-decoration: none;
         color: inherit;
-    }
-    
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        margin-top: 10px;
     }
     
     .card-icon {
@@ -140,17 +134,13 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
 
     with col1:
         # Card Chatbot
-        if st.button("", key="card_chat", help="Chatbot Inteligente"):
+        if st.button("🤖 Chatbot Inteligente", key="card_chat", use_container_width=True):
             st.session_state.current_page = 'chat'
             st.rerun()
 
         st.markdown("""
-        <div class="card" onclick="document.querySelector('[data-testid=\"stButton\"][title=\"Chatbot Inteligente\"] button').click()">
+        <div class="card">
             <div>
-                <div class="card-icon">
-                    🤖
-                </div>
-                <div class="card-title">Chatbot Inteligente</div>
                 <div class="card-subtitle">
                     Converse naturalmente sobre dados aeroportuários. 
                     Faça perguntas e receba respostas detalhadas com gráficos e análises.
@@ -163,17 +153,13 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         st.markdown("<br>", unsafe_allow_html=True)
 
         # Card Trends
-        if st.button("", key="card_trends", help="Análise de Tendências"):
+        if st.button("📈 Análise de Tendências", key="card_trends", use_container_width=True):
             st.session_state.current_page = 'trends'
             st.rerun()
 
         st.markdown("""
-        <div class="card" onclick="document.querySelector('[data-testid=\"stButton\"][title=\"Análise de Tendências\"] button').click()">
+        <div class="card">
             <div>
-                <div class="card-icon">
-                    📈
-                </div>
-                <div class="card-title">Análise de Tendências</div>
                 <div class="card-subtitle">
                     Descubra padrões e tendências históricas. 
                     Previsões com IA e detecção automática de anomalias.
@@ -185,17 +171,13 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
 
     with col2:
         # Card Insights
-        if st.button("", key="card_insights", help="Insights Automáticos"):
+        if st.button("📊 Insights Automáticos", key="card_insights", use_container_width=True):
             st.session_state.current_page = 'insights'
             st.rerun()
 
         st.markdown("""
-        <div class="card" onclick="document.querySelector('[data-testid=\"stButton\"][title=\"Insights Automáticos\"] button').click()">
+        <div class="card">
             <div>
-                <div class="card-icon">
-                    📊
-                </div>
-                <div class="card-title">Insights Automáticos</div>
                 <div class="card-subtitle">
                     Relatórios inteligentes gerados automaticamente. 
                     Análises de mercado, sazonalidade e comparativas.
@@ -208,17 +190,13 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         st.markdown("<br>", unsafe_allow_html=True)
 
         # Card Analytics
-        if st.button("", key="card_analytics", help="Analytics Avançado"):
+        if st.button("⚡ Analytics Avançado", key="card_analytics", use_container_width=True):
             st.session_state.current_page = 'analytics'
             st.rerun()
 
         st.markdown("""
-        <div class="card" onclick="document.querySelector('[data-testid=\"stButton\"][title=\"Analytics Avançado\"] button').click()">
+        <div class="card">
             <div>
-                <div class="card-icon">
-                    ⚡
-                </div>
-                <div class="card-title">Analytics Avançado</div>
                 <div class="card-subtitle">
                     Análises estatísticas complexas, correlações, 
                     clustering e recomendações inteligentes com IA.
