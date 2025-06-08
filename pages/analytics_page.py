@@ -15,18 +15,18 @@ from analytics.advanced_ai import (
 )
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h1><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">analytics</i>Analytics Avançado com IA</h1>', unsafe_allow_html=True)
+    st.title("⚡ Analytics Avançado com IA")
     st.markdown("---")
     
     # Menu de analytics
     analytics_type = st.selectbox(
         "Selecione o tipo de análise:",
         [
-            '<i class="material-icons">show_chart</i> Análise de Correlação',
-            '<i class="material-icons">my_location</i> Segmentação de Aeroportos', 
-            '<i class="material-icons">speed</i> KPIs de Performance',
-            '<i class="material-icons">psychology</i> Previsão de Demanda',
-            '<i class="material-icons">lightbulb</i> Recomendações Inteligentes'
+            "📊 Análise de Correlação",
+            "🎯 Segmentação de Aeroportos", 
+            "📈 KPIs de Performance",
+            "🔮 Previsão de Demanda",
+            "💡 Recomendações Inteligentes"
         ]
     )
     
@@ -44,7 +44,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         render_ai_recommendations(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 
 def render_correlation_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">show_chart</i>Análise de Correlação</h2>', unsafe_allow_html=True)
+    st.subheader("📊 Análise de Correlação")
     
     # Simular matriz de correlação
     if st.button("🔍 Executar Análise de Correlação", type="primary"):
@@ -97,7 +97,7 @@ def render_correlation_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                 st.markdown(insight)
 
 def render_cluster_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">my_location</i>Segmentação de Aeroportos</h2>', unsafe_allow_html=True)
+    st.subheader("🎯 Segmentação de Aeroportos")
     
     if st.button("🔬 Executar Análise de Clusters", type="primary"):
         with st.spinner("Segmentando aeroportos por características..."):
@@ -169,7 +169,7 @@ def render_cluster_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                 """)
 
 def render_kpi_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">speed</i>KPIs de Performance</h2>', unsafe_allow_html=True)
+    st.subheader("📈 KPIs de Performance")
     
     # KPIs principais
     col1, col2, col3, col4 = st.columns(4)
@@ -251,7 +251,7 @@ def render_kpi_analysis(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         st.plotly_chart(fig, use_container_width=True)
 
 def render_demand_forecasting(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">psychology</i>Previsão de Demanda</h2>', unsafe_allow_html=True)
+    st.subheader("🔮 Previsão de Demanda")
     
     # Controles de previsão
     col1, col2 = st.columns(2)
@@ -325,7 +325,7 @@ def render_demand_forecasting(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                 st.metric("Tendência", "Crescimento", "Forte demanda esperada")
 
 def render_ai_recommendations(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">lightbulb</i>Recomendações Inteligentes</h2>', unsafe_allow_html=True)
+    st.subheader("💡 Recomendações Inteligentes")
     
     if st.button("🧠 Gerar Recomendações com IA", type="primary"):
         with st.spinner("Analisando dados e gerando recomendações..."):

@@ -18,7 +18,7 @@ from chatbot_logic import (
 )
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h1><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">insights</i>Insights Automáticos com IA</h1>', unsafe_allow_html=True)
+    st.title("📊 Insights Automáticos com IA")
     st.markdown("---")
     
     # Controles
@@ -37,7 +37,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         )
     
     with col3:
-        if st.button('<i class="material-icons" style="vertical-align: middle; margin-right: 5px;">refresh</i>Gerar Insights', type="primary"):
+        if st.button("🔄 Gerar Insights", type="primary"):
             st.session_state.refresh_insights = True
     
     st.markdown("---")
@@ -53,7 +53,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 
 def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">track_changes</i>Insights Principais</h2>', unsafe_allow_html=True)
+    st.subheader("🎯 Insights Principais")
     
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)
@@ -105,9 +105,9 @@ def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     
     # Insights gerados por IA
     with st.container():
-        st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">psychology</i>Análise Inteligente</h2>', unsafe_allow_html=True)
+        st.subheader("🤖 Análise Inteligente")
         
-        if st.button('<i class="material-icons" style="vertical-align: middle; margin-right: 5px;">auto_awesome</i>Gerar Insights com IA', key="generate_ai_insights"):
+        if st.button("Gerar Insights com IA", key="generate_ai_insights"):
             with st.spinner("Analisando dados e gerando insights..."):
                 insights = generate_automated_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
                 
@@ -125,7 +125,7 @@ def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                     st.error("Não foi possível gerar insights no momento.")
 
 def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">trending_up</i>Análise de Mercado</h2>', unsafe_allow_html=True)
+    st.subheader("📈 Análise de Mercado")
     
     # Market share geral
     market_data = calcular_market_share(PASTA_ARQUIVOS_PARQUET, ano=ultimo_ano)
@@ -160,7 +160,7 @@ def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                         st.info("Análise de mercado não disponível no momento.")
 
 def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">calendar_today</i>Análise Sazonal</h2>', unsafe_allow_html=True)
+    st.subheader("🗓️ Análise Sazonal")
     
     # Aqui você implementaria análise sazonal
     st.info("🚧 Análise sazonal em desenvolvimento. Em breve com insights sobre:")
@@ -214,7 +214,7 @@ def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         st.plotly_chart(fig, use_container_width=True)
 
 def render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.markdown('<h2><i class="material-icons" style="vertical-align: middle; margin-right: 10px;">compare_arrows</i>Análise Comparativa</h2>', unsafe_allow_html=True)
+    st.subheader("⚖️ Análise Comparativa")
     
     # Comparação ano a ano
     anos_comparacao = [ultimo_ano-1, ultimo_ano]
