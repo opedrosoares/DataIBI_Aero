@@ -170,6 +170,17 @@ st.markdown(
         }
     }
 
+    /* Primary button styling */
+    .stButton > button[data-testid="stBaseButton-primary"] {
+        background-color: #007bff !important;
+        border-color: #007bff !important;
+        color: white !important;
+    }
+    .stButton > button[data-testid="stBaseButton-primary"]:hover {
+        background-color: #0056b3 !important;
+        border-color: #0056b3 !important;
+    }
+
     /* Classe personalizada para o botão "Ver mais" */
     .st-key-show_more button {
         width: auto;
@@ -235,8 +246,8 @@ if st.session_state.current_page != 'chat':
 if st.session_state.current_page == 'chat':
     chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
 elif st.session_state.current_page == 'insights':
-    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
+    insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
 elif st.session_state.current_page == 'trends':
-    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
+    trends_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)
 elif st.session_state.current_page == 'analytics':
-    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
+    analytics_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH)

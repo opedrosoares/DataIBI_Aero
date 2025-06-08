@@ -11,8 +11,27 @@ from datetime import datetime, timedelta
 from analytics.trends_ai import predict_future_trends, analyze_growth_patterns, detect_anomalies
 from queries.database import obter_historico_movimentacao
 
-def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.title("📈 Análise de Tendências com IA")
+def get_image_as_base64(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+        
+def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
+    # Título e Descrição
+    icon_base64 = get_image_as_base64(ICON_PATH)
+    if icon_base64:
+        st.markdown(
+            f"""
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <img src="data:image/gif;base64,{icon_base64}" style="max-width: 100px; margin-right: 20px;filter: grayscale(0.6);">
+                <h1 style="margin: 0px;color: #595a5c;">Análise de Tendências com IA</h1>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.title("📈 Análise de Tendências com IA")
     st.markdown("---")
     
     # Controles de configuração
