@@ -12,33 +12,22 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Importa as funções de lógica do chatbot
 from chatbot_logic import (
-    parse_pergunta_com_llm,
-    consultar_movimentacoes_aeroportuarias,
-    obter_aeroporto_mais_movimentado,
-    obter_aeroporto_mais_voos_internacionais,
-    obter_operador_mais_passageiros,
-    obter_operador_mais_cargas,
-    obter_principal_destino,
-    obter_ultimo_ano_disponivel,
-    formatar_numero_br,
-    aeroporto_nome_para_icao,
-    mes_numero_para_nome,
-    operador_icao_para_nome,
-    obter_operador_maiores_atrasos,
-    calcular_market_share,
-    obter_top_10_aeroportos,
-    gerar_grafico_market_share,
-    obter_historico_movimentacao,
-    gerar_grafico_historico,
-    reescrever_resposta_com_llm,
-    transcrever_audio
-)
+    parse_pergunta_com_llm, consultar_movimentacoes_aeroportuarias,
+    obter_aeroporto_mais_movimentado, obter_aeroporto_mais_voos_internacionais,
+    obter_operador_mais_passageiros, obter_operador_mais_cargas,
+    obter_principal_destino, obter_ultimo_ano_disponivel, formatar_numero_br,
+    aeroporto_nome_para_icao, mes_numero_para_nome, operador_icao_para_nome,
+    obter_operador_maiores_atrasos, calcular_market_share,
+    obter_top_10_aeroportos, gerar_grafico_market_share,
+    obter_historico_movimentacao, gerar_grafico_historico,
+    reescrever_resposta_com_llm, transcrever_audio)
 
 # Importa as funções de banco de dados
 from database_logic import init_db, save_conversation, get_all_conversations_as_df
 
 # Importa as páginas
 from pages import chat_page, insights_page, trends_page, analytics_page
+
 
 # --- Função para codificar imagem ---
 def get_image_as_base64(path):
@@ -47,13 +36,12 @@ def get_image_as_base64(path):
     with open(path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
 
+
 # --- Configuração da página Streamlit ---
-st.set_page_config(
-    page_title="Observatório Aeroportuário - IBI",
-    page_icon="images/favicon.png",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Observatório Aeroportuário - IBI",
+                   page_icon="images/favicon.png",
+                   layout="wide",
+                   initial_sidebar_state="expanded")
 
 # Inicializa o banco de dados ao iniciar o app
 init_db()
@@ -64,7 +52,9 @@ PASTA_ARQUIVOS_PARQUET = 'dados_aeroportuarios_parquet'
 # --- Obter o Último Ano Disponível ---
 ultimo_ano = obter_ultimo_ano_disponivel(PASTA_ARQUIVOS_PARQUET)
 if ultimo_ano is None:
-    st.error("Não foi possível determinar o último ano disponível nos dados. Verifique a pasta de arquivos Parquet.")
+    st.error(
+        "Não foi possível determinar o último ano disponível nos dados. Verifique a pasta de arquivos Parquet."
+    )
     st.stop()
 
 # --- Logo e CSS Personalizado ---
@@ -72,8 +62,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
 ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
-st.markdown(
-    """
+st.markdown("""
     <style>
     /* Design principal da página */
     .stApp {
@@ -128,10 +117,43 @@ st.markdown(
     .stDeployButton {
         display: none;
     }
+
+    .st-key-audio_recorder {
+        position: fixed;
+        z-index: 999;
+        width: 40px;
+        bottom: 50px;
+        margin-left: 13.5%;
+    }
+    /* condition for screen size minimum of 736px */
+    @media (max-width:736px) {
+        .st-key-audio_recorder {
+            position: fixed;
+            z-index: 999;
+            right: 10px;
+            width: 40px;
+            bottom: 50px;
+        }
+    }
+
+    /* Classe personalizada para o botão "Ver mais" */
+    .st-key-show_more button {
+        width: auto !important;
+        border-radius: 50%;
+    }
+    .st-key-show_more .stButton {
+        text-align: center;
+    }
+    .st-key-chat_input {
+        padding-right: 3em;
+    }
+    div[data-testid="stFullScreenFrame"] > div:first-child { margin: 0 auto; display: table; width: 100%; max-width: 700px; }
+    .stImage { width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 1rem; margin-bottom: 1rem; }
+    .stImage img { width: 100%; max-width: 500px; height: auto; display: block; }
+    .stButton > button { text-align: left; justify-content: flex-start; width: 100%; }
     </style>
     """,
-    unsafe_allow_html=True
-)
+            unsafe_allow_html=True)
 
 # --- Barra Lateral com Navegação ---
 with st.sidebar:
@@ -144,7 +166,7 @@ with st.sidebar:
     # Menu de navegação
     pages = {
         "🤖 Chatbot": "chat",
-        "📊 Insights Automáticos": "insights", 
+        "📊 Insights Automáticos": "insights",
         "📈 Análise de Tendências": "trends",
         "⚡ Analytics Avançado": "analytics"
     }
@@ -155,7 +177,9 @@ with st.sidebar:
 
     # Botões de navegação
     for page_name, page_key in pages.items():
-        if st.button(page_name, key=f"nav_{page_key}", use_container_width=True):
+        if st.button(page_name,
+                     key=f"nav_{page_key}",
+                     use_container_width=True):
             st.session_state.current_page = page_key
             st.rerun()
 
@@ -166,7 +190,9 @@ with st.sidebar:
         st.markdown("### 🗒️ Histórico")
         history_df = get_all_conversations_as_df()
         if not history_df.empty:
-            st.dataframe(history_df.tail(5), use_container_width=True, hide_index=True)
+            st.dataframe(history_df.tail(5),
+                         use_container_width=True,
+                         hide_index=True)
         else:
             st.info("Histórico vazio.")
 
