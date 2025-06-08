@@ -38,7 +38,7 @@ from chatbot_logic import (
 from database_logic import init_db, save_conversation, get_all_conversations_as_df
 
 # Importa as páginas
-from pages import chat_page, insights_page, trends_page, analytics_page
+from pages import home_page, chat_page, insights_page, trends_page, analytics_page
 
 # --- Função para codificar imagem ---
 def get_image_as_base64(path):
@@ -213,6 +213,7 @@ with st.sidebar:
 
     # Menu de navegação
     pages = {
+        "🏠 Página Inicial": "home",
         "🤖 Chatbot": "chat",
         "📊 Insights Automáticos": "insights", 
         "📈 Análise de Tendências": "trends",
@@ -221,7 +222,7 @@ with st.sidebar:
 
     # Inicializa a página atual
     if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'chat'
+        st.session_state.current_page = 'home'
 
     # Botões de navegação
     for page_name, page_key in pages.items():
@@ -240,15 +241,17 @@ with st.sidebar:
         else:
             st.info("Histórico vazio.")
 
-# --- Display Logo in Main Content Area for non-chat pages ---
-if st.session_state.current_page != 'chat':
+# --- Display Logo in Main Content Area for specific pages ---
+if st.session_state.current_page in ['insights', 'trends', 'analytics']:
     if LOGO_PATH and os.path.exists(LOGO_PATH):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.image(LOGO_PATH, width=300)
 
 # --- Renderização da Página Atual ---
-if st.session_state.current_page == 'chat':
+if st.session_state.current_page == 'home':
+    home_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+elif st.session_state.current_page == 'chat':
     chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, CHAT_ICON_PATH)
 elif st.session_state.current_page == 'insights':
     insights_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, INSIGHTS_ICON_PATH)
