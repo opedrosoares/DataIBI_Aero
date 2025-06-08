@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import os
-import base64
 
 from analytics.advanced_ai import (
     generate_correlation_analysis,

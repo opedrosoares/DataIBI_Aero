@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import os
-import base64
 from datetime import datetime, timedelta
 
 from analytics.trends_ai import predict_future_trends, analyze_growth_patterns, detect_anomalies
