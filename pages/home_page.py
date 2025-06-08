@@ -93,17 +93,20 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                     "border-radius": "15px",
                     "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
                     "margin": "10px 0px",
-                    "background-color": "#ffffff",
-                    "border": "1px solid #e9ecef"
+                    "background": "linear-gradient(135deg, #85bec0 0%, #5996c9 100%) transparent"
                 },
                 "text": {
-                    "font-family": "Arial, sans-serif",
-                    "color": "#6c757d"
+                    "color": "#fff",
+                    "font-weight": "lighter",
+                    "padding": "0 2em"
                 },
                 "title": {
-                    "font-size": "1.2rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
-                    "color": "#2c3e50"
+                    "color": "#fff"
+                },
+                "filter": {
+                    "background-color": "rgba(0, 0, 0, 0)"
                 }
             },
             key="card_chat"
@@ -125,17 +128,20 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                     "border-radius": "15px",
                     "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
                     "margin": "10px 0px",
-                    "background-color": "#ffffff",
-                    "border": "1px solid #e9ecef"
+                    "background": "linear-gradient(135deg, #85bec0 0%, #5996c9 100%) transparent"
                 },
                 "text": {
-                    "font-family": "Arial, sans-serif",
-                    "color": "#6c757d"
+                    "color": "#fff",
+                    "font-weight": "lighter",
+                    "padding": "0 2em"
                 },
                 "title": {
-                    "font-size": "1.2rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
-                    "color": "#2c3e50"
+                    "color": "#fff"
+                },
+                "filter": {
+                    "background-color": "rgba(0, 0, 0, 0)"
                 }
             },
             key="card_trends"
@@ -158,17 +164,20 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                     "border-radius": "15px",
                     "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
                     "margin": "10px 0px",
-                    "background-color": "#ffffff",
-                    "border": "1px solid #e9ecef"
+                    "background": "linear-gradient(135deg, #85bec0 0%, #5996c9 100%) transparent"
                 },
                 "text": {
-                    "font-family": "Arial, sans-serif",
-                    "color": "#6c757d"
+                    "color": "#fff",
+                    "font-weight": "lighter",
+                    "padding": "0 2em"
                 },
                 "title": {
-                    "font-size": "1.2rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
-                    "color": "#2c3e50"
+                    "color": "#fff"
+                },
+                "filter": {
+                    "background-color": "rgba(0, 0, 0, 0)"
                 }
             },
             key="card_insights"
@@ -190,17 +199,20 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                     "border-radius": "15px",
                     "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
                     "margin": "10px 0px",
-                    "background-color": "#ffffff",
-                    "border": "1px solid #e9ecef"
+                    "background": "linear-gradient(135deg, #85bec0 0%, #5996c9 100%) transparent"
                 },
                 "text": {
-                    "font-family": "Arial, sans-serif",
-                    "color": "#6c757d"
+                    "color": "#fff",
+                    "font-weight": "lighter",
+                    "padding": "0 2em"
                 },
                 "title": {
-                    "font-size": "1.2rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
-                    "color": "#2c3e50"
+                    "color": "#fff"
+                },
+                "filter": {
+                    "background-color": "rgba(0, 0, 0, 0)"
                 }
             },
             key="card_analytics"
