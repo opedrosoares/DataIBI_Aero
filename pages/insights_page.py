@@ -18,7 +18,7 @@ from chatbot_logic import (
 )
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.title("📊 Insights Automáticos com IA")
+    st.title("<i class='fas fa-chart-bar'></i> Insights Automáticos com IA", unsafe_allow_html=True)
     st.markdown("---")
     
     # Controles
@@ -37,7 +37,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         )
     
     with col3:
-        if st.button("🔄 Gerar Insights", type="primary"):
+        if st.button("<i class='fas fa-sync-alt'></i> Gerar Insights", type="primary"):
             st.session_state.refresh_insights = True
     
     st.markdown("---")
@@ -53,7 +53,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano)
 
 def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.subheader("🎯 Insights Principais")
+    st.subheader("<i class='fas fa-bullseye'></i> Insights Principais", unsafe_allow_html=True)
     
     # Métricas principais
     col1, col2, col3, col4 = st.columns(4)
@@ -105,7 +105,7 @@ def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     
     # Insights gerados por IA
     with st.container():
-        st.subheader("🤖 Análise Inteligente")
+        st.subheader("<i class='fas fa-robot'></i> Análise Inteligente", unsafe_allow_html=True)
         
         if st.button("Gerar Insights com IA", key="generate_ai_insights"):
             with st.spinner("Analisando dados e gerando insights..."):
@@ -125,7 +125,7 @@ def render_general_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                     st.error("Não foi possível gerar insights no momento.")
 
 def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.subheader("📈 Análise de Mercado")
+    st.subheader("<i class='fas fa-chart-line'></i> Análise de Mercado", unsafe_allow_html=True)
     
     # Market share geral
     market_data = calcular_market_share(PASTA_ARQUIVOS_PARQUET, ano=ultimo_ano)
@@ -160,7 +160,7 @@ def render_market_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
                         st.info("Análise de mercado não disponível no momento.")
 
 def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.subheader("🗓️ Análise Sazonal")
+    st.subheader("<i class='fas fa-calendar-alt'></i> Análise Sazonal", unsafe_allow_html=True)
     
     # Aqui você implementaria análise sazonal
     st.info("🚧 Análise sazonal em desenvolvimento. Em breve com insights sobre:")
@@ -214,7 +214,7 @@ def render_seasonal_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         st.plotly_chart(fig, use_container_width=True)
 
 def render_comparative_insights(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.subheader("⚖️ Análise Comparativa")
+    st.subheader("<i class='fas fa-balance-scale'></i> Análise Comparativa", unsafe_allow_html=True)
     
     # Comparação ano a ano
     anos_comparacao = [ultimo_ano-1, ultimo_ano]

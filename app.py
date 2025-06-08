@@ -75,6 +75,7 @@ ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
 st.markdown(
     """
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
     /* Design principal da página */
     .stApp {
@@ -197,10 +198,10 @@ with st.sidebar:
 
     # Menu de navegação
     pages = {
-        "🤖 Chatbot": "chat",
-        "📊 Insights Automáticos": "insights", 
-        "📈 Análise de Tendências": "trends",
-        "⚡ Analytics Avançado": "analytics"
+        '<i class="fas fa-robot"></i> Chatbot': "chat",
+        '<i class="fas fa-chart-bar"></i> Insights Automáticos': "insights", 
+        '<i class="fas fa-chart-line"></i> Análise de Tendências': "trends",
+        '<i class="fas fa-bolt"></i> Analytics Avançado': "analytics"
     }
 
     # Inicializa a página atual
@@ -217,7 +218,7 @@ with st.sidebar:
 
     # Histórico de conversas (apenas na página do chat)
     if st.session_state.current_page == 'chat':
-        st.markdown("### 🗒️ Histórico")
+        st.markdown("### <i class='fas fa-clipboard-list'></i> Histórico", unsafe_allow_html=True)
         history_df = get_all_conversations_as_df()
         if not history_df.empty:
             st.dataframe(history_df.tail(5), use_container_width=True, hide_index=True)

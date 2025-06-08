@@ -12,7 +12,7 @@ from analytics.trends_ai import predict_future_trends, analyze_growth_patterns, 
 from queries.database import obter_historico_movimentacao
 
 def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
-    st.title("📈 Análise de Tendências com IA")
+    st.title("<i class='fas fa-chart-line'></i> Análise de Tendências com IA", unsafe_allow_html=True)
     st.markdown("---")
     
     # Controles de configuração
@@ -42,10 +42,10 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
     
     # Tabs para diferentes tipos de análise
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Tendências Históricas", 
-        "🔮 Previsões", 
-        "🚨 Detecção de Anomalias", 
-        "📋 Relatório IA"
+        "<i class='fas fa-chart-bar'></i> Tendências Históricas", 
+        "<i class='fas fa-crystal-ball'></i> Previsões", 
+        "<i class='fas fa-exclamation-triangle'></i> Detecção de Anomalias", 
+        "<i class='fas fa-file-alt'></i> Relatório IA"
     ])
     
     with tab1:
@@ -61,7 +61,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano):
         render_ai_report(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type)
 
 def render_historical_trends(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
-    st.subheader("📊 Análise de Tendências Históricas")
+    st.subheader("<i class='fas fa-chart-bar'></i> Análise de Tendências Históricas", unsafe_allow_html=True)
     
     # Obter dados históricos
     tipo_consulta = "passageiros" if metric_type == "Passageiros" else "carga"
@@ -141,7 +141,7 @@ def render_historical_trends(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
                         st.info("Análise de padrões não disponível no momento.")
 
 def render_predictions(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type, prediction_months):
-    st.subheader("🔮 Previsões com IA")
+    st.subheader("<i class='fas fa-crystal-ball'></i> Previsões com IA", unsafe_allow_html=True)
     
     # Obter dados históricos para previsão
     tipo_consulta = "passageiros" if metric_type == "Passageiros" else "carga"
@@ -241,7 +241,7 @@ def render_predictions(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type, predicti
         st.error("Dados históricos não disponíveis para previsão.")
 
 def render_anomaly_detection(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
-    st.subheader("🚨 Detecção de Anomalias")
+    st.subheader("<i class='fas fa-exclamation-triangle'></i> Detecção de Anomalias", unsafe_allow_html=True)
     
     # Obter dados históricos
     tipo_consulta = "passageiros" if metric_type == "Passageiros" else "carga"
@@ -324,7 +324,7 @@ def render_anomaly_detection(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
         st.error("Dados não disponíveis para análise de anomalias.")
 
 def render_ai_report(PASTA_ARQUIVOS_PARQUET, ultimo_ano, metric_type):
-    st.subheader("📋 Relatório Inteligente")
+    st.subheader("<i class='fas fa-file-alt'></i> Relatório Inteligente", unsafe_allow_html=True)
     
     if st.button("📄 Gerar Relatório IA", type="primary", key="generate_ai_report"):
         with st.spinner("Gerando relatório abrangente com IA..."):
