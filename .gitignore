@@ -13,3 +13,15 @@ env/
 
 # Log files
 *.log
+
+# Arquivos de ambiente
+.env.*
+
+# Logs e arquivos temporários
+*.tmp
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
