@@ -123,13 +123,13 @@ st.markdown(
     }
 
     /* Primary button styling */
-    .stButton > button[data-testid="baseButton-primary"] {
+    .stButton > button[data-testid="stBaseButton-primary"] {
         background-color: #007bff !important;
         border-color: #007bff !important;
         color: white !important;
     }
 
-    .stButton > button[data-testid="baseButton-primary"]:hover {
+    .stButton > button[data-testid="stBaseButton-primary"]:hover {
         background-color: #0056b3 !important;
         border-color: #0056b3 !important;
     }
