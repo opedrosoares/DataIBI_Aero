@@ -117,6 +117,11 @@ st.markdown(
         }
     }
 
+    /* Title styling */
+    h1 {
+        color: #595a5c;
+    }
+
     /* Hide streamlit default elements */
     .stApp > footer {
         display: none;
