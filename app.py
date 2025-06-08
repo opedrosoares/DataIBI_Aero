@@ -122,6 +122,18 @@ st.markdown(
         color: #595a5c !important;
     }
 
+    /* Primary button styling */
+    .stButton > button[data-testid="baseButton-primary"] {
+        background-color: #007bff !important;
+        border-color: #007bff !important;
+        color: white !important;
+    }
+
+    .stButton > button[data-testid="baseButton-primary"]:hover {
+        background-color: #0056b3 !important;
+        border-color: #0056b3 !important;
+    }
+
     /* Hide streamlit default elements */
     .stApp > footer {
         display: none;
