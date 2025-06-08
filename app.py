@@ -185,6 +185,9 @@ st.markdown(
         background-color: #0056b3 !important;
         border-color: #0056b3 !important;
     }
+    .stButton > button[data-testid="stBaseButton-secondary"]:hover {
+        border-color: #0056b3 !important;
+    }
 
     /* Classe personalizada para o botão "Ver mais" */
     .st-key-show_more button {
