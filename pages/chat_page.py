@@ -41,6 +41,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
     # Define LOGO_WATERMARK_PATH for use in chart generation
     APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     LOGO_WATERMARK_PATH = os.path.join(APP_DIR, "images", "logo.png")
+    
     # Display logo at the top
     if LOGO_PATH and os.path.exists(LOGO_PATH):
         col1, col2, col3 = st.columns([1, 2, 1])

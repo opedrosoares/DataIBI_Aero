@@ -250,7 +250,7 @@ if st.session_state.current_page in ['insights', 'trends', 'analytics']:
 
 # --- Renderização da Página Atual ---
 if st.session_state.current_page == 'home':
-    home_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH)
+    home_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, CHAT_ICON_PATH)
 elif st.session_state.current_page == 'chat':
     chat_page.render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, CHAT_ICON_PATH)
 elif st.session_state.current_page == 'insights':
