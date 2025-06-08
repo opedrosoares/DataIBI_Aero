@@ -1,6 +1,8 @@
+
 import streamlit as st
 import base64
 import os
+from streamlit_card import card
 
 
 def get_image_as_base64(path):
@@ -20,64 +22,12 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         with col2:
             st.image(LOGO_PATH, width=300)
         
-    # CSS customizado para os cards
+    # CSS customizado
     st.markdown("""
     <style>
-    .card {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        border: 1px solid #e9ecef;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        text-decoration: none;
-        color: inherit;
-        margin-top: 10px;
-    }
-    
-    .card-icon {
-        width: 80px;
-        height: 80px;
-        margin: 0 auto 1rem;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #85bec0 0%, #5996c9 100%);
-    }
-    
-    .card-title {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #2c3e50;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    
-    .card-subtitle {
-        font-size: 1rem;
-        color: #6c757d;
-        text-align: center;
-        line-height: 1.4;
-    }
-    
     .welcome-section {
         text-align: center;
         margin-bottom: 3rem;
-    }
-    
-    .welcome-title {
-        font-size: 2.5rem;
-        color: #2c3e50;
-        margin-bottom: 1rem;
-    }
-    
-    .welcome-subtitle {
-        font-size: 1.2rem;
-        color: #6c757d;
-        margin-bottom: 2rem;
     }
     
     .stats-container {
@@ -92,8 +42,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         color: #fff !important;
     }
     </style>
-    """,
-                unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # Seção de boas-vindas
     icon_base64 = get_image_as_base64(ICON_PATH)
@@ -124,87 +73,142 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
             </div>
         </div>
     </div>
-    """,
-                unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # Cards das páginas
+    # Cards das páginas usando streamlit-card
     st.markdown("### 🚀 Explore nossas funcionalidades")
 
     col1, col2 = st.columns(2)
 
     with col1:
         # Card Chatbot
-        if st.button("🤖 Chatbot Inteligente", key="card_chat", use_container_width=True):
+        chatbot_clicked = card(
+            title="🤖 Chatbot Inteligente",
+            text="Converse naturalmente sobre dados aeroportuários. Faça perguntas e receba respostas detalhadas com gráficos e análises.",
+            image=None,
+            styles={
+                "card": {
+                    "width": "100%",
+                    "height": "200px",
+                    "border-radius": "15px",
+                    "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
+                    "margin": "10px 0px",
+                    "background-color": "#ffffff",
+                    "border": "1px solid #e9ecef"
+                },
+                "text": {
+                    "font-family": "Arial, sans-serif",
+                    "color": "#6c757d"
+                },
+                "title": {
+                    "font-size": "1.2rem",
+                    "font-weight": "bold",
+                    "color": "#2c3e50"
+                }
+            },
+            key="card_chat"
+        )
+        
+        if chatbot_clicked:
             st.session_state.current_page = 'chat'
             st.rerun()
 
-        st.markdown("""
-        <div class="card">
-            <div>
-                <div class="card-subtitle">
-                    Converse naturalmente sobre dados aeroportuários. 
-                    Faça perguntas e receba respostas detalhadas com gráficos e análises.
-                </div>
-            </div>
-        </div>
-        """,
-                    unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
         # Card Trends
-        if st.button("📈 Análise de Tendências", key="card_trends", use_container_width=True):
+        trends_clicked = card(
+            title="📈 Análise de Tendências",
+            text="Descubra padrões e tendências históricas. Previsões com IA e detecção automática de anomalias.",
+            image=None,
+            styles={
+                "card": {
+                    "width": "100%",
+                    "height": "200px",
+                    "border-radius": "15px",
+                    "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
+                    "margin": "10px 0px",
+                    "background-color": "#ffffff",
+                    "border": "1px solid #e9ecef"
+                },
+                "text": {
+                    "font-family": "Arial, sans-serif",
+                    "color": "#6c757d"
+                },
+                "title": {
+                    "font-size": "1.2rem",
+                    "font-weight": "bold",
+                    "color": "#2c3e50"
+                }
+            },
+            key="card_trends"
+        )
+        
+        if trends_clicked:
             st.session_state.current_page = 'trends'
             st.rerun()
 
-        st.markdown("""
-        <div class="card">
-            <div>
-                <div class="card-subtitle">
-                    Descubra padrões e tendências históricas. 
-                    Previsões com IA e detecção automática de anomalias.
-                </div>
-            </div>
-        </div>
-        """,
-                    unsafe_allow_html=True)
-
     with col2:
         # Card Insights
-        if st.button("📊 Insights Automáticos", key="card_insights", use_container_width=True):
+        insights_clicked = card(
+            title="📊 Insights Automáticos",
+            text="Relatórios inteligentes gerados automaticamente. Análises de mercado, sazonalidade e comparativas.",
+            image=None,
+            styles={
+                "card": {
+                    "width": "100%",
+                    "height": "200px",
+                    "border-radius": "15px",
+                    "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
+                    "margin": "10px 0px",
+                    "background-color": "#ffffff",
+                    "border": "1px solid #e9ecef"
+                },
+                "text": {
+                    "font-family": "Arial, sans-serif",
+                    "color": "#6c757d"
+                },
+                "title": {
+                    "font-size": "1.2rem",
+                    "font-weight": "bold",
+                    "color": "#2c3e50"
+                }
+            },
+            key="card_insights"
+        )
+        
+        if insights_clicked:
             st.session_state.current_page = 'insights'
             st.rerun()
 
-        st.markdown("""
-        <div class="card">
-            <div>
-                <div class="card-subtitle">
-                    Relatórios inteligentes gerados automaticamente. 
-                    Análises de mercado, sazonalidade e comparativas.
-                </div>
-            </div>
-        </div>
-        """,
-                    unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
         # Card Analytics
-        if st.button("⚡ Analytics Avançado", key="card_analytics", use_container_width=True):
+        analytics_clicked = card(
+            title="⚡ Analytics Avançado",
+            text="Análises estatísticas complexas, correlações, clustering e recomendações inteligentes com IA.",
+            image=None,
+            styles={
+                "card": {
+                    "width": "100%",
+                    "height": "200px",
+                    "border-radius": "15px",
+                    "box-shadow": "0 4px 15px rgba(0,0,0,0.1)",
+                    "margin": "10px 0px",
+                    "background-color": "#ffffff",
+                    "border": "1px solid #e9ecef"
+                },
+                "text": {
+                    "font-family": "Arial, sans-serif",
+                    "color": "#6c757d"
+                },
+                "title": {
+                    "font-size": "1.2rem",
+                    "font-weight": "bold",
+                    "color": "#2c3e50"
+                }
+            },
+            key="card_analytics"
+        )
+        
+        if analytics_clicked:
             st.session_state.current_page = 'analytics'
             st.rerun()
-
-        st.markdown("""
-        <div class="card">
-            <div>
-                <div class="card-subtitle">
-                    Análises estatísticas complexas, correlações, 
-                    clustering e recomendações inteligentes com IA.
-                </div>
-            </div>
-        </div>
-        """,
-                    unsafe_allow_html=True)
 
     # Seção de recursos
     st.markdown("---")
