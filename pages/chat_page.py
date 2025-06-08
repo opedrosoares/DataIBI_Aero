@@ -43,7 +43,6 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.image(LOGO_PATH, width=300)
-        st.markdown("---")
     
     # Título e Descrição
     icon_base64 = get_image_as_base64(ICON_PATH)
@@ -175,7 +174,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                             for _, row in df_historico.iterrows():
                                 dados_texto.append(f"- Ano {row['ANO']}: {formatar_numero_br(row['TotalValor'])}")
                             resposta_chatbot_texto = f"Dados da evolução de {tipo_consulta} para **{local}**:\n" + "\n".join(dados_texto)
-                            resposta_chatbot_imagem = gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=LOGO_PATH)
+                            resposta_chatbot_imagem = gerar_grafico_historico(df_historico, tipo_consulta, local, logo_path=LOGO_WATERMARK_PATH)
                         else:
                             resposta_chatbot_texto = f"Não encontrei dados para gerar o histórico de {tipo_consulta} para **{local}**."
                     elif parametros.get('intencao_market_share'):
@@ -196,7 +195,7 @@ def render(PASTA_ARQUIVOS_PARQUET, ultimo_ano, LOGO_PATH, ICON_PATH):
                                 nome_operador = operador_icao_para_nome.get(op['NR_AERONAVE_OPERADOR'], op['NR_AERONAVE_OPERADOR'])
                                 lista_operadores.append(f"- **{nome_operador}**: {op['VooShare']:.1f}% dos voos e {op['PaxShare']:.1f}% dos passageiros.")
                             resposta_chatbot_texto += "\n".join(lista_operadores)
-                            resposta_chatbot_imagem = gerar_grafico_market_share(resultado_share['data'], logo_path=LOGO_PATH)
+                            resposta_chatbot_imagem = gerar_grafico_market_share(resultado_share['data'], logo_path=LOGO_WATERMARK_PATH)
                     elif parametros.get('intencao_mais_movimentado'):
                         resultado_ranking = obter_aeroporto_mais_movimentado(PASTA_ARQUIVOS_PARQUET, ano=parametros.get('ano'))
                         if resultado_ranking:

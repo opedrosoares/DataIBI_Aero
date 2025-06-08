@@ -69,7 +69,8 @@ if ultimo_ano is None:
 
 # --- Logo e CSS Personalizado ---
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-LOGO_PATH = os.path.join(APP_DIR, "images", "logo.png")
+LOGO_PATH = os.path.join(APP_DIR, "images", "logo.svg")
+LOGO_WATERMARK_PATH = os.path.join(APP_DIR, "images", "logo.png")
 ICON_PATH = os.path.join(APP_DIR, "images", "icone.gif")
 
 st.markdown(
@@ -128,6 +129,44 @@ st.markdown(
     .stDeployButton {
         display: none;
     }
+
+    div[data-testid="stFullScreenFrame"] > div:first-child { margin: 0 auto; display: table; width: 100%; max-width: 700px; }
+    .stImage { width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 1rem; margin-bottom: 1rem; }
+    .stImage img { width: 100%; max-width: 500px; height: auto; display: block; }
+    .stButton > button { text-align: left; justify-content: flex-start; width: 100%; }
+
+    .st-key-audio_recorder {
+        position: fixed;
+        z-index: 999;
+        width: 40px;
+        bottom: 50px;
+        margin-left: 100px;
+    }
+    /* condition for screen size minimum of 736px */
+    @media (max-width:736px) {
+        .st-key-audio_recorder {
+            position: fixed;
+            z-index: 999;
+            right: 10px;
+            width: 40px;
+            bottom: 50px;
+        }
+    }
+
+    /* Classe personalizada para o botão "Ver mais" */
+    .st-key-show_more button {
+        width: auto;
+        border-radius: 50%;
+    }
+    .st-key-show_more .stButton {
+        text-align: center;
+    }
+    .st-key-chat_input {
+        padding-right: 3em;
+    }
+    div[data-testid="stSidebarNav"] {
+        display: none;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -138,8 +177,6 @@ with st.sidebar:
     # Logo na sidebar
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, width=200)
-
-    st.title("🗂️ Navegação")
 
     # Menu de navegação
     pages = {
@@ -176,7 +213,6 @@ if st.session_state.current_page != 'chat':
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.image(LOGO_PATH, width=300)
-        st.markdown("---")
 
 # --- Renderização da Página Atual ---
 if st.session_state.current_page == 'chat':
